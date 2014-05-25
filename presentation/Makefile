@@ -2,11 +2,12 @@ LHS_FILES = Main.lhs
 
 all: presentation.pdf
 
-_presentation.tex: presentation.tex ../src/Main.lhs
-	lhs2TeX --poly presentation.tex -o _presentation.tex
-
-presentation.pdf: _presentation.tex
-	pdflatex _presentation.tex
+presentation.pdf: presentation.tex
+	mkdir build
+	latex -shell-escape --output-directory=build presentation.tex
+	latex -shell-escape --output-directory=build presentation.tex
+	dvipdf presentation.dvi
 
 clean:
-	rm _presentation.*
+	$(RM) -r build
+	$(RM) presentation.pdf

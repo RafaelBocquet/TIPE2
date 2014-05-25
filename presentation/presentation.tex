@@ -1,7 +1,93 @@
-\documentclass{article}
-%include polycode.fmt
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper, margin=0.6in]{geometry}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{tcolorbox}
+\usepackage{mathtools}
+\usepackage{comment}
+\usepackage{psfrag}
+\usepackage{graphviz}
+\usepackage{etoolbox}
+\usepackage[nomessages]{fp}
+
+% Macros to size the graph nodes depending on the content.
+
+\newcommand*{\getlength}[2]{
+  \FPeval\length{1.1 * \number#2 / 4718592.0}
+  \csedef{#1}{\length}
+}
+
+\newlength{\getwidthlengthw}
+\newlength{\getwidthlengthh}
+
+\newcommand*{\getwidthlength}[2]{
+  \settowidth{\getwidthlengthw}{#2}
+  \getlength{#1width}{\getwidthlengthw}
+  \settoheight{\getwidthlengthh}{#2}
+  \getlength{#1height}{\getwidthlengthh}
+}
+
+\newcommand*{\nodepsfrag}[2]{
+  \psfrag{#1}[cc][cc]{#2}
+  \getwidthlength{#1}{#2}
+}
+
+% Begin document
+
 \begin{document}
-%include ../src/Main.lhs
-%include ../src/Expression.lhs
-%include ../src/Environment.lhs
+
+identityCongTy : \\
+\begin{math}
+(A : \top) \rightarrow (a \, b : A) \rightarrow (a = b) \rightarrow (B : \top) \rightarrow (f : A \rightarrow B) \rightarrow (f a = f b)
+\end{math} \\ \\
+\begin{math}
+\Pi{(a : \top)} . \Pi{(b : a)} . \Pi{(c : a)} . \\ \Pi{(d : \Pi{(d : \Pi{(d : a)} . \top)} . \Pi{(e : (d b))} . (d c))} . \\ \Pi{(e : \top)} . \Pi{(f : \Pi{(f : a)} . e)} . \Pi{(g : \Pi{(g : e)} . \top)} . \Pi{(h : (g (f b)))} . \\ (g (f c))
+\end{math} \\
+ normalises to \\
+
+\begin{psfrags}
+
+\nodepsfrag{n0}{$E_{1}$}
+\nodepsfrag{n1}{$\top$}
+\nodepsfrag{n2}{$E_{0}$}
+\nodepsfrag{n3}{$E_{1}$}
+\nodepsfrag{n4}{$\Pi{(a : \Pi{(a : E_{2})} \rightarrow \top)} \rightarrow \Pi{(b : (a E_{1}))} \rightarrow (a E_{0})$}
+\nodepsfrag{n5}{$\top$}
+\nodepsfrag{n6}{$\Pi{(a : E_{4})} \rightarrow E_{0}$}
+\nodepsfrag{n7}{$\Pi{(a : E_{1})} \rightarrow \top$}
+\nodepsfrag{n8}{$(E_{0} (E_{1} E_{5}))$}
+
+\nodepsfrag{n0}{$E_{1}$}
+\expandafter\digraph G {
+  graph[size=8];
+  node[shape=rectangle];
+  n0[width=\csuse{n0width}, height=\csuse{n0height}];
+  n1[width=\csuse{n1width}, height=\csuse{n1height}];
+  n2[width=\csuse{n2width}, height=\csuse{n2height}];
+  n3[width=\csuse{n3width}, height=\csuse{n3height}];
+  n4[width=\csuse{n4width}, height=\csuse{n4height}];
+  n5[width=\csuse{n5width}, height=\csuse{n5height}];
+  n6[width=\csuse{n6width}, height=\csuse{n6height}];
+  n7[width=\csuse{n7width}, height=\csuse{n7height}];
+  n8[width=\csuse{n8width}, height=\csuse{n8height}];
+  n2 -> n0;
+  n1 -> n2;
+  n2 -> n3;
+  n1 -> n4;
+  n2 -> n4;
+  n3 -> n4;
+  n1 -> n6;
+  n5 -> n6;
+  n2 -> n7;
+  n1 -> n8;
+  n2 -> n8;
+  n6 -> n8;
+}
+\end{psfrags}
+
+
 \end{document}

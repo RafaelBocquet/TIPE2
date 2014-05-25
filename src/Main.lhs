@@ -4,6 +4,7 @@ module Main where
 import Expression as Expr
 import Environment as Env
 import Evaluation as Eval
+import WSearch
 
 import Util
 
@@ -101,6 +102,13 @@ testTypecheckUnifyExpression :: String -> Expression -> Expression -> IO ()
 testTypecheckUnifyExpression s e t = putStrLn . ((red s ++ " : ") ++) $ show . runTC $ do
   eTy <- typecheck Env.empty e
   unify Env.empty eTy t
+testWNormalise :: String -> Expression -> IO ()
+testWNormalise s e = putStrLn $ red s ++ " : " ++ (show . runWC $ wNormalise Env.empty e)
+
+testLatexTypecheckExpression :: String -> Expression -> IO ()
+testLatexTypecheckExpression s e = putStrLn $ s ++ " : \n" ++ showLatexExpression e ++ "\n typechecks to \n" ++ (either show showLatexExpression . runTC . typecheck Env.empty $ e) ++ "\n"
+testLatexWNormalise :: String -> Expression -> IO ()
+testLatexWNormalise s e = putStrLn $ s ++ " : \n" ++ showLatexExpression e ++ "\n normalises to \n" ++ (either show ((("\\digraph{" ++ s ++ "}{") ++) . (++ "}") . showDotWExpression) . runWC . wNormalise Env.empty $ e) ++ "\n"
 
 main :: IO ()
 main = do
@@ -118,4 +126,14 @@ main = do
   testTypecheckExpression "vect" vect
   testTypecheckExpression "vect Nat 5" (applicationList vect [natType, five])
   testTypecheckUnifyExpression "identityCong" identityCong identityCongTy
+  putStrLn "Testing wNormalise"
+  testWNormalise "identitySymetric" identitySymetric
+  testWNormalise "identityCongTy" identityCongTy
+
+  testLatexTypecheckExpression "identityCongTy" identityCongTy
+  testLatexTypecheckExpression "identityCong" identityCong
+  testLatexTypecheckExpression "identitySymetricPrf" identitySymetricPrf
+
+  testLatexWNormalise "identitySymetric" identitySymetric
+  testLatexWNormalise "identityCongTy" identityCongTy
 \end{code}

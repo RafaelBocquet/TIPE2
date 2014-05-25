@@ -7,9 +7,9 @@ import Util
 import Control.Applicative
 import Control.Monad
 
-import Debug.Trace
-
+import qualified Data.Set as Set
 import Data.Char
+
 
 data Expression =
     Variable Int
@@ -38,6 +38,21 @@ instance Show Expression where
 
       show' i (Renaming str t)     = yellow str
 
+showLatexExpression :: Expression -> String
+showLatexExpression e = "\\large\n\\begin{math}\n" ++ showLatexExpression' 0 e ++ "\n\\end{math}"
+  where
+    showLatexExpression' i (Variable j)
+      | j < i                    = [chr $ (ord 'a') + i - j - 1]
+      | otherwise                = "E_{" ++ show (j - i) ++ "}"
+    showLatexExpression' i (Application f t)    = "(" ++ showLatexExpression' i f ++ " " ++ showLatexExpression' i t ++ ")"
+
+    showLatexExpression' i SetType              = "\\top"
+
+    showLatexExpression' i (Abstraction tau t)  = "\\Lambda{(" ++ [chr $ (ord 'a') + i] ++ " : " ++ showLatexExpression' i tau ++ ")} \\rightarrow " ++ showLatexExpression' (i+1) t
+    showLatexExpression' i (FunctionType tau sigma) = "\\Pi{(" ++ [chr $ (ord 'a') + i] ++ " : " ++ showLatexExpression' i tau ++ ")} \\rightarrow " ++ showLatexExpression' (i+1) sigma
+
+    showLatexExpression' i (Renaming str t)     = "\\text{" ++ str ++ "}"
+
 lift :: Int -> Expression -> Expression
 lift i (Variable j)
   | i > j                                     = Variable j
@@ -57,12 +72,21 @@ substitute i e' (Variable j)
   | i < j                                     = Variable (j-1)
   | i == j                                    = e'
   | i > j                                     = Variable j
-substitute i e' (Application f t)                      = Application (substitute i e' f) (substitute i e' t)
-substitute i e' SetType                                = SetType
-substitute i e' (Abstraction tau t)                    = Abstraction (substitute i e' tau) (substitute (i+1) (lift 0 e') t)
-substitute i e' (FunctionType tau sigma)               = FunctionType (substitute i e' tau) (substitute (i+1) (lift 0 e') sigma)
-substitute i e' (Renaming s e)                         = Renaming s (substitute i e' e)
+substitute i e' (Application f t)             = Application (substitute i e' f) (substitute i e' t)
+substitute i e' SetType                       = SetType
+substitute i e' (Abstraction tau t)           = Abstraction (substitute i e' tau) (substitute (i+1) (lift 0 e') t)
+substitute i e' (FunctionType tau sigma)      = FunctionType (substitute i e' tau) (substitute (i+1) (lift 0 e') sigma)
+substitute i e' (Renaming s e)                = Renaming s (substitute i e' e)
 
+dependencies :: Int -> Expression -> Set.Set Int
+dependencies i (Variable j)
+  | j < i                                     = Set.empty
+  | otherwise                                 = Set.singleton (j - i)
+dependencies i (Application f t)              = Set.union (dependencies i f) (dependencies i t)
+dependencies i SetType                        = Set.empty
+dependencies i (Abstraction tau t)            = Set.union (dependencies i tau) (dependencies (i + 1) t)
+dependencies i (FunctionType tau sigma)       = Set.union (dependencies i tau) (dependencies (i + 1) sigma)
+dependencies i (Renaming s e)                 = dependencies i e
 
 -- some functions
 applicationList :: Expression -> [Expression] -> Expression
