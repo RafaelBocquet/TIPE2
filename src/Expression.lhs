@@ -21,7 +21,7 @@ data Expression =
   | FunctionType Expression Expression
 
   | Renaming String Expression
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 instance Show Expression where
   show = show' 0
@@ -87,6 +87,16 @@ dependencies i SetType                        = Set.empty
 dependencies i (Abstraction tau t)            = Set.union (dependencies i tau) (dependencies (i + 1) t)
 dependencies i (FunctionType tau sigma)       = Set.union (dependencies i tau) (dependencies (i + 1) sigma)
 dependencies i (Renaming s e)                 = dependencies i e
+
+applyPermutation :: Int -> [Int] -> Expression -> Expression
+applyPermutation i p (Variable j)
+  | j < i                                     = Variable j
+  | otherwise                                 = Variable $ p !! (j - i)
+applyPermutation i p (Application f t)        = Application (applyPermutation i p f) (applyPermutation i p t)
+applyPermutation i p SetType                  = SetType
+applyPermutation i p (Abstraction tau t)      = Abstraction (applyPermutation i p tau) (applyPermutation (i + 1) p t)
+applyPermutation i p (FunctionType tau sigma) = FunctionType (applyPermutation i p tau) (applyPermutation (i + 1) p sigma)
+applyPermutation i p (Renaming s e)           = Renaming s $ applyPermutation i p e
 
 -- some functions
 applicationList :: Expression -> [Expression] -> Expression

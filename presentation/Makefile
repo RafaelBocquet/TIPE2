@@ -3,10 +3,10 @@ LHS_FILES = Main.lhs
 all: presentation.pdf
 
 presentation.pdf: presentation.tex
-	mkdir build
-	latex -shell-escape --output-directory=build presentation.tex
-	latex -shell-escape --output-directory=build presentation.tex
-	dvipdf presentation.dvi
+	mkdir -p build
+	cd build && latex -shell-escape ../presentation.tex
+	cd build && latex -shell-escape ../presentation.tex
+	cd build && dvipdf presentation.dvi ../presentation.pdf
 
 clean:
 	$(RM) -r build

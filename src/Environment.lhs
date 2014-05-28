@@ -1,7 +1,7 @@
 \begin{code}
 module Environment where
 
-import Expression
+import Expression as Expr
 
 import Prelude hiding (lookup)
 import Control.Applicative
@@ -21,5 +21,8 @@ lookup (Environment env) i = lookup' env i
     lookup' [] _     = Nothing
     lookup' (x:_) 0  = Just x
     lookup' (_:xs) i = lookup' xs (i-1)
+
+applyPermutation :: Environment -> [Int] -> Environment
+applyPermutation (Environment env) p = Environment $ flip fmap [0 .. length env - 1] $ \i -> Expr.applyPermutation 0 p (env !! (p !! i))
 
 \end{code}

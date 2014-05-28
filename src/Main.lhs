@@ -4,7 +4,7 @@ module Main where
 import Expression as Expr
 import Environment as Env
 import Evaluation as Eval
-import WSearch
+import PSearch
 
 import Util
 
@@ -58,9 +58,16 @@ identityCong = abstractionList
     , identityReflective (Variable 1) (Application (Variable 0) (Variable 4))
     ]
 
+isContractibleType :: Expression
+isContractibleType =
+  functionTypeList
+    [ SetType
+    , Variable 0
+    , Variable 1
+    ] $ identityType (Variable 2) (Variable 1) (Variable 0)
+
 unitTypeUnique :: Expression
-unitTypeUnique =
-  FunctionType unitType $ identityType unitType unitValue (Variable 0)
+unitTypeUnique = applicationList isContractibleType [unitType, unitValue]
 
 unitTypeUniquePrf :: Expression
 unitTypeUniquePrf =
@@ -102,13 +109,13 @@ testTypecheckUnifyExpression :: String -> Expression -> Expression -> IO ()
 testTypecheckUnifyExpression s e t = putStrLn . ((red s ++ " : ") ++) $ show . runTC $ do
   eTy <- typecheck Env.empty e
   unify Env.empty eTy t
-testWNormalise :: String -> Expression -> IO ()
-testWNormalise s e = putStrLn $ red s ++ " : " ++ (show . runWC $ wNormalise Env.empty e)
+testPNormalise :: String -> Expression -> IO ()
+testPNormalise s e = putStrLn $ red s ++ " : " ++ (show . runPN $ pNormalise e)
 
 testLatexTypecheckExpression :: String -> Expression -> IO ()
 testLatexTypecheckExpression s e = putStrLn $ s ++ " : \n" ++ showLatexExpression e ++ "\n typechecks to \n" ++ (either show showLatexExpression . runTC . typecheck Env.empty $ e) ++ "\n"
-testLatexWNormalise :: String -> Expression -> IO ()
-testLatexWNormalise s e = putStrLn $ s ++ " : \n" ++ showLatexExpression e ++ "\n normalises to \n" ++ (either show ((("\\digraph{" ++ s ++ "}{") ++) . (++ "}") . showDotWExpression) . runWC . wNormalise Env.empty $ e) ++ "\n"
+testLatexPNormalise :: String -> Expression -> IO ()
+testLatexPNormalise s e = putStrLn $ s ++ " : \n" ++ showLatexExpression e ++ "\n normalises to \n" ++ (either show ((("\\digraph{" ++ s ++ "}{") ++) . (++ "}") . showDotPExpression) . runPN . pNormalise $ e) ++ "\n"
 
 main :: IO ()
 main = do
@@ -126,14 +133,16 @@ main = do
   testTypecheckExpression "vect" vect
   testTypecheckExpression "vect Nat 5" (applicationList vect [natType, five])
   testTypecheckUnifyExpression "identityCong" identityCong identityCongTy
-  putStrLn "Testing wNormalise"
-  testWNormalise "identitySymetric" identitySymetric
-  testWNormalise "identityCongTy" identityCongTy
+  testTypecheckExpression "isContractibleType" isContractibleType
+  putStrLn $ yellow "Testing pNormalise"
+  testPNormalise "identitySymetric" identitySymetric
+  testPNormalise "identityCongTy" identityCongTy
+  testPNormalise "isContractibleType" isContractibleType
 
   testLatexTypecheckExpression "identityCongTy" identityCongTy
   testLatexTypecheckExpression "identityCong" identityCong
   testLatexTypecheckExpression "identitySymetricPrf" identitySymetricPrf
 
-  testLatexWNormalise "identitySymetric" identitySymetric
-  testLatexWNormalise "identityCongTy" identityCongTy
+  testLatexPNormalise "identitySymetric" identitySymetric
+  testLatexPNormalise "identityCongTy" identityCongTy
 \end{code}

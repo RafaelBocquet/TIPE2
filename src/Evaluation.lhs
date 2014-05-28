@@ -66,7 +66,7 @@ normaliseHead gamma (Application f t)                    = do
   f' <- normaliseHead gamma f
   case f' of
     Abstraction tau e -> normaliseHead gamma $ substitute 0 t e
-    Variable i -> return $ Variable i
+    Variable i -> return $ Application (Variable i) t
     _ -> throwError $ OtherError $ show f'
 normaliseHead gamma e                                    = return e
 
