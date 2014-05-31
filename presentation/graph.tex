@@ -1,0 +1,48 @@
+
+identityCongTy : \\
+\begin{math}
+(A : \top) \rightarrow (a \, b : A) \rightarrow (a = b) \rightarrow (B : \top) \rightarrow (f : A \rightarrow B) \rightarrow (f a = f b)
+\end{math} \\ \\
+\begin{math}
+\Pi{(a : \top)} . \Pi{(b : a)} . \Pi{(c : a)} . \\ \Pi{(d : \Pi{(d : \Pi{(d : a)} . \top)} . \Pi{(e : (d b))} . (d c))} . \\ \Pi{(e : \top)} . \Pi{(f : \Pi{(f : a)} . e)} . \Pi{(g : \Pi{(g : e)} . \top)} . \Pi{(h : (g (f b)))} . \\ (g (f c))
+\end{math} \\
+ normalises to \\
+
+\begin{psfrags}
+\nodepsfrag{n0}{$(E_{1} (E_{2} E_{5}))$}
+\nodepsfrag{n1}{$(E_{1} (E_{2} E_{6}))$}
+\nodepsfrag{n2}{$\Pi{(a : E_{3})} \rightarrow \top$}
+\nodepsfrag{n3}{$\Pi{(a : E_{7})} \rightarrow E_{3}$}
+\nodepsfrag{n4}{$\top$}
+\nodepsfrag{n5}{$\Pi{(a : \Pi{(a : E_{7})} \rightarrow \top)} \rightarrow \Pi{(b : (a E_{6}))} \rightarrow (a E_{5})$}
+\nodepsfrag{n6}{$E_{7}$}
+\nodepsfrag{n7}{$E_{7}$}
+\nodepsfrag{n8}{$\top$}
+\expandafter\digraph G {
+  graph[size=8];
+  node[shape=rectangle];
+  n0[width=\csuse{n0width}, height=\csuse{n0height}, color=red];
+  n1[width=\csuse{n1width}, height=\csuse{n1height}];
+  n2[width=\csuse{n2width}, height=\csuse{n2height}];
+  n3[width=\csuse{n3width}, height=\csuse{n3height}];
+  n4[width=\csuse{n4width}, height=\csuse{n4height}];
+  n5[width=\csuse{n5width}, height=\csuse{n5height}];
+  n6[width=\csuse{n6width}, height=\csuse{n6height}];
+  n7[width=\csuse{n7width}, height=\csuse{n7height}];
+  n8[width=\csuse{n8width}, height=\csuse{n8height}];
+  n2 -> n0;
+  n3 -> n0;
+  n6 -> n0;
+  n2 -> n1;
+  n3 -> n1;
+  n7 -> n1;
+  n4 -> n2;
+  n4 -> n3;
+  n8 -> n3;
+  n6 -> n5;
+  n7 -> n5;
+  n8 -> n5;
+  n8 -> n6;
+  n8 -> n7;
+}
+\end{psfrags}

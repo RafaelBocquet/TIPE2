@@ -7,10 +7,9 @@ cabal-version:       >=1.10
 
 executable tipe2
   main-is:             Main.lhs
-  other-modules:       Expression,
+  other-modules:       Term,
                        Environment,
-                       Evaluation,
-                       Pretty
+                       Evaluation
   build-depends:       base >=4.6,
                        containers,
                        mtl,

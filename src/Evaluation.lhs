@@ -1,8 +1,9 @@
 \begin{code}
 module Evaluation where
 
-import Expression
-import Environment
+import Term
+import Environment as Env
+import Substitution as Subst
 import Util
 
 import Prelude hiding (lookup)
@@ -15,91 +16,219 @@ import Control.Monad.Identity
 
 import Debug.Trace
 
-data TCError =
+-- Error
+
+data ECError =
     OtherError String
-  | FreeVariable
-  | UnificationFailure Environment Expression Expression
-  | ExceptedFunction Expression
-  | UnifyErrorTrace Environment Expression Expression TCError
-  | TypecheckErrorTrace Environment Expression TCError
-  deriving(Eq)
+  | FreeVariable Int
+  | UnificationFailure Environment Term Term
+  | ExceptedFunction Term
+  | UnifyErrorTrace Environment Term Term ECError
+  | TypecheckErrorTrace Environment Term ECError
 
-instance Show TCError where
-  show (OtherError s)                    = "\n\t" ++ red "OtherError" ++ " : " ++ s
-  show FreeVariable                      = "\n\t" ++ red "FreeVariable"
-  show (ExceptedFunction ty)             = "\n\t" ++ red "ExceptedFunction : got " ++ show ty
-  show (UnificationFailure gamma e1 e2)        = "\n\t" ++ red "Can't unify" ++ " (" ++ show e1 ++ ") " ++ red "\n\t\twith" ++ " (" ++ show e2 ++ ") " ++ red "\n\t\tin " ++ show gamma
-  show (UnifyErrorTrace gamma e1 e2 err)       = "\n\t" ++ red "In unification of" ++ " (" ++ show e1 ++ ") " ++ red "\n\t\twith" ++ " (" ++ show e2 ++ ") " ++ red "\n\t\tin " ++ show gamma ++ " : " ++ show err
-  show (TypecheckErrorTrace gamma e err) = "\n\t" ++ red "When typechecking" ++ " (" ++ show e ++ ") " ++ red "\n\t\tin " ++ show gamma ++ " : " ++ show err
+instance Show ECError where
+  show (OtherError s)                          = "\n\t" ++ red "OtherError" <+> ":" <+> s
+  show (FreeVariable i)                        = "\n\t" ++ red "FreeVariable" <+> show i
+  show (ExceptedFunction ty)                   = "\n\t" ++ red "ExceptedFunction : got" <+> show ty
+  show (UnificationFailure gamma e1 e2)        = "\n\t" ++ red "Can't unify" <+> "(" ++ show e1 ++ ")" ++ red "\n\t\twith" <+> "(" ++ show e2 ++ ")" ++ red "\n\t\tin" <+> show gamma
+  show (UnifyErrorTrace gamma e1 e2 err)       = "\n\t" ++ red "In unification of" <+> "(" ++ show e1 ++ ")" ++ red "\n\t\twith" <+> "(" ++ show e2 ++ ")" ++ red "\n\t\tin " ++ show gamma ++ " : " ++ show err
+  show (TypecheckErrorTrace gamma e err)       = "\n\t" ++ red "When typechecking" <+> "(" ++ show e ++ ")" ++ red "\n\t\tin" <+> show gamma <+> ":" <+> show err
 
-type TC a = EitherT TCError Identity a
+-- Monad
 
-runTC :: TC a -> Either TCError a
-runTC = runIdentity . runEitherT
+type EC a = EitherT ECError Identity a
+
+runEC :: EC a -> Either ECError a
+runEC = runIdentity . runEitherT
 
 -- Unification
--- Tries not to fully evaluate the expressions when possible
--- Returns the unified expression
-unify :: Environment -> Expression -> Expression -> TC Expression
-unify gamma e1 e2
-  | e1 == e2 = return e1
-  | otherwise = do
-      e'1 <- normaliseHead gamma e1
-      e'2 <- normaliseHead gamma e2
-      unify' gamma e'1 e'2
-    `catchError` (throwError . UnifyErrorTrace gamma e1 e2)
+
+unify :: Environment -> Term -> Term -> EC Term
+unify gamma e1 e2 = do
+    e1' <- normaliseHead gamma e1
+    e2' <- normaliseHead gamma e2
+    if e1' == e2'
+      then return e1'
+      else (unify' gamma e1' e2') `catchError` (throwError . UnifyErrorTrace gamma e1 e2)
   where
-    unify' gamma (Abstraction tau t) (Abstraction sigma s) = do
-      tau' <- unify gamma tau sigma
-      t' <- unify (tau' `bind` gamma) t s
+    unify' gamma (Application f1 t1) (Application f2 t2)                               = do
+      f' <- unify gamma f1 f2
+      t' <- unify gamma t1 t2
+      return $ Application f' t'
+    unify' gamma (Abstraction tau1 t1) (Abstraction tau2 t2)                           = do
+      tau' <- unify gamma tau1 tau2
+      t' <- unify (tau' `Env.bind` gamma) t1 t2
       return $ Abstraction tau' t'
-    unify' gamma (FunctionType tau sigma) (FunctionType upsilon omega) = do
-      tau' <- unify gamma tau upsilon
-      sigma' <- unify (tau' `bind` gamma) sigma omega
-      return $ Abstraction tau' sigma'
+    unify' gamma (FunctionType tau1 sigma1) (FunctionType tau2 sigma2)                 = do
+      tau' <- unify gamma tau1 tau2
+      sigma' <- unify (tau' `Env.bind` gamma) sigma1 sigma2
+      return $ FunctionType tau' sigma'
+    unify' gamma (TupleType taus1) (TupleType taus2)                                   = do
+      TupleType . snd <$> foldM (\(gamma', taus') (tau1, tau2) -> do
+          tau' <- unify gamma' tau1 tau2
+          return $ (tau' `Env.bind` gamma, tau' : taus')
+        ) (gamma, []) (zip taus1 taus2)
+    unify' gamma (TupleConstruct taus1 ts1) (TupleConstruct taus2 ts2)                 = do
+      uncurry TupleConstruct . snd <$> foldM (\(gamma', (taus', ts')) ((tau1, t1), (tau2, t2)) -> do
+          tau' <- unify gamma' tau1 tau2
+          t' <- unify gamma' t1 t2
+          return $ (tau' `Env.bind` gamma, (tau' : taus', t' : ts'))
+        ) (gamma, ([], [])) (zip (zip taus1 ts1) (zip taus2 ts2))
+    unify' gamma (TupleDestruct taus1 sigma1 f1) (TupleDestruct taus2 sigma2 f2)       = do
+      taus' <- snd <$> foldM (\(gamma', taus') (tau1, tau2) -> do
+          tau' <- unify gamma' tau1 tau2
+          return $ (tau' `Env.bind` gamma, tau' : taus')
+        ) (gamma, []) (zip taus1 taus2)
+      sigma' <- unify (foldl (flip Env.bind) gamma taus') sigma1 sigma2
+      f' <- unify gamma f1 f2
+      return $ TupleDestruct taus' sigma' f'
+    unify' gamma (CoTupleType taus1) (CoTupleType taus2)                               = do
+      CoTupleType <$> mapM (uncurry $ unify gamma) (zip taus1 taus2)
+    unify' gamma e1@(CoTupleConstruct taus1 j1 t1) e2@(CoTupleConstruct taus2 j2 t2)
+      | j1 == j2                                                                       = do
+        taus' <- mapM (uncurry $ unify gamma) (zip taus1 taus2)
+        t' <- unify gamma t1 t2
+        return $ CoTupleConstruct taus' j1 t'
+      | otherwise                                                                      = throwError $ UnificationFailure gamma e1 e2
+    unify' gamma (CoTupleDestruct taus1 sigma1 fs1) (CoTupleDestruct taus2 sigma2 fs2) = do
+      taus' <- mapM (uncurry $ unify gamma) (zip taus1 taus2)
+      sigma' <- unify (CoTupleType taus' `Env.bind` gamma) sigma1 sigma2
+      fs' <- mapM (uncurry $ unify gamma) (zip fs1 fs2)
+      return $ CoTupleDestruct taus' sigma' fs'
+    unify' gamma (IdentityType tau1 x1 y1) (IdentityType tau2 x2 y2) = do
+      tau' <- unify gamma tau1 tau2
+      x' <- unify gamma x1 x2
+      y' <- unify gamma y1 y2
+      return $ IdentityType tau' x' y'
+    unify' gamma (IdentityReflective tau1 x1) (IdentityReflective tau2 x2) = do
+      tau' <- unify gamma tau1 tau2
+      x' <- unify gamma x1 x2
+      return $ IdentityReflective tau' x'
+    unify' gamma (IdentityDestruct tau1 x1 y1) (IdentityDestruct tau2 x2 y2) = do
+      tau' <- unify gamma tau1 tau2
+      x' <- unify gamma x1 x2
+      y' <- unify gamma y1 y2
+      return $ IdentityDestruct tau' x' y'
     unify' gamma e1 e2 = throwError $ UnificationFailure gamma e1 e2
+-- Normalisation (term must be valid)
 
--- Normalisation in WHNF of a typechecked expression
-normaliseHead :: Environment -> Expression -> TC Expression
-normaliseHead gamma (Renaming str t) = normaliseHead gamma t
-normaliseHead gamma (Application f t)                    = do
-  f' <- normaliseHead gamma f
-  case f' of
-    Abstraction tau e -> normaliseHead gamma $ substitute 0 t e
-    Variable i -> return $ Application (Variable i) t
-    _ -> throwError $ OtherError $ show f'
-normaliseHead gamma e                                    = return e
+normaliseHead :: Environment -> Term -> EC Term
+normaliseHead gamma (Variable i)                                      = return $ Variable i
+normaliseHead gamma (Application (Abstraction tau e) t)               = normaliseHead gamma $ substitute (t `Subst.bind` Subst.empty) e
+normaliseHead gamma e@(Application (TupleDestruct taus sigma f) t)    = do
+  t' <- normaliseHead gamma t
+  case t' of
+    TupleConstruct _ ts ->
+      normaliseHead gamma $ applicationList f ts
+    otherwise ->
+      return e
+normaliseHead gamma e@(Application (CoTupleDestruct taus sigma fs) t) = do
+  t' <- normaliseHead gamma t
+  case t' of
+    CoTupleConstruct _ j t ->
+      normaliseHead gamma $ Application (fs !! j) t
+    otherwise ->
+      return e
+normaliseHead gamma (Application f t)                                 = throwError $ OtherError "..."
+normaliseHead gamma SetType                                           = return SetType
+normaliseHead gamma e@(Abstraction tau t)                             = return e
+normaliseHead gamma e@(FunctionType tau sigma)                        = return e
+normaliseHead gamma e@(TupleType taus)                                = return e
+normaliseHead gamma e@(TupleConstruct taus ts)                        = return e
+normaliseHead gamma e@(TupleDestruct taus sigma f)                    = return e
+normaliseHead gamma e@(CoTupleType taus)                              = return e
+normaliseHead gamma e@(CoTupleConstruct taus j t)                     = return e
+normaliseHead gamma e@(CoTupleDestruct taus sigma fs)                 = return e
+normaliseHead gamma e@(IdentityType tau x y)                          = return e
+normaliseHead gamma e@(IdentityReflective tau x)                      = return e
+normaliseHead gamma e@(IdentityDestruct tau x y)                      = return e
+-- normalise :: Environment -> Term -> EC Term
 
--- Full Normalisation
-normalise :: Environment -> Expression -> TC Expression
-normalise gamma e = throwError $ OtherError "Unimplemented !"
+-- Typechecking
 
--- Typechecks an expression
-typecheck :: Environment -> Expression -> TC Expression
-typecheck gamma e = typecheck' gamma e `catchError` (throwError . TypecheckErrorTrace gamma e)
+typecheck :: Environment -> Term -> EC Term
+typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErrorTrace gamma t)
   where
-    typecheck' gamma (Variable i)                         = maybe (throwError FreeVariable) return $ lookup gamma i
-    typecheck' gamma (Application f t)                    = do
+    typecheck' gamma (Variable i)                = do
+      maybe (throwError $ FreeVariable i) return $ lookup gamma i
+    typecheck' gamma (Application f t)           = do
       fTy <- typecheck gamma f
-      fTy <- normaliseHead gamma fTy
-      tTy <- typecheck gamma t
       case fTy of
         FunctionType tau sigma -> do
+          tTy <- typecheck gamma t
           unify gamma tTy tau
-          return $ substitute 0 t sigma
-        _ -> throwError $ ExceptedFunction fTy
-    typecheck' gamma SetType                              = return SetType
-    typecheck' gamma (Abstraction tau t)                  = do
-      tauTy <- typecheck gamma tau
-      unify gamma tauTy SetType
-      tTy <- typecheck (tau `bind` gamma) t
-      return $ FunctionType tau tTy
-    typecheck' gamma (FunctionType tau sigma)             = do
-      tauTy <- typecheck gamma tau
-      unify gamma tauTy SetType
-      sigmaTy <- typecheck (tau `bind` gamma) sigma
-      unify (tau `bind` gamma) sigmaTy SetType
+          return sigma
+        otherwise -> throwError $ ExceptedFunction fTy
+    typecheck' gamma SetType                     = do
       return SetType
-    typecheck' gamma (Renaming str t) = typecheck' gamma t
+    typecheck' gamma (Abstraction tau t)         = do
+      tauTy <- typecheck gamma tau
+      unify gamma tauTy SetType
+      tTy <- typecheck (tau `Env.bind` gamma) t
+      return $ FunctionType tau tTy
+    typecheck' gamma (FunctionType tau sigma)    = do
+      tauTy <- typecheck gamma tau
+      unify gamma tauTy SetType
+      sigmaTy <- typecheck (tau `Env.bind` gamma) sigma
+      unify gamma sigmaTy SetType
+      return SetType
+    typecheck' gamma (TupleType taus)            = do
+      foldM_ (\gamma' tau -> do
+          tauTy <- typecheck gamma' tau
+          unify gamma' tauTy SetType
+          return $ tau `Env.bind` gamma
+        ) gamma taus
+      return SetType
+    typecheck' gamma (TupleConstruct taus ts)    = do
+      foldM_ (\(gamma', s)  (tau, t) -> do
+          tauTy <- typecheck gamma' tau
+          unify gamma' tauTy SetType
+          tTy <- typecheck gamma t
+          unify gamma tTy $ substitute s tau
+          return $ (tau `Env.bind` gamma, t `Subst.bind` s)
+        ) (gamma, Subst.empty) (zip taus ts)
+      return $ TupleType taus
+    typecheck' gamma (TupleDestruct taus sigma f)      = do
+      typecheck' gamma (TupleType taus)
+      sigmaTy <- typecheck gamma sigma
+      unify (TupleType taus `Env.bind` gamma) sigmaTy SetType
+      fTy <- typecheck gamma f
+      unify gamma fTy $ functionTypeList taus sigma
+      return $ FunctionType (TupleType taus) sigma 
+    typecheck' gamma (CoTupleType taus)          = do
+      forM_ taus $ \tau -> do
+        tauTy <- typecheck gamma tau
+        unify gamma tau SetType
+      return SetType
+    typecheck' gamma (CoTupleConstruct taus j t) = do
+      typecheck' gamma (CoTupleType taus)
+      tTy <- typecheck gamma t
+      unify gamma tTy $ taus !! j
+      return $ CoTupleType taus
+    typecheck' gamma (CoTupleDestruct taus sigma fs)      = do
+      typecheck' gamma (CoTupleType taus)
+      sigmaTy <- typecheck gamma sigma
+      unify (CoTupleType taus `Env.bind` gamma) sigmaTy SetType
+      forM_ (zip taus fs) $ \(tau, f) -> do
+        fTy <- typecheck gamma f
+        unify gamma fTy $ FunctionType tau sigma
+      return $ FunctionType (CoTupleType taus) $ lift sigma
+    typecheck' gamma (IdentityType tau x y)      = do
+      tauTy <- typecheck gamma tau
+      unify gamma tauTy SetType
+      xTy <- typecheck gamma tau
+      unify gamma xTy tau
+      yTy <- typecheck gamma tau
+      unify gamma yTy tau
+      return SetType
+    typecheck' gamma (IdentityReflective tau x)  = do
+      tauTy <- typecheck gamma tau
+      unify gamma tauTy SetType
+      xTy <- typecheck gamma tau
+      unify gamma xTy tau
+      return $ IdentityType tau x x
+    typecheck' gamma (IdentityDestruct tau x y)  = do
+      typecheck' gamma (IdentityType tau x y)
+      return $ functionTypeList [IdentityType tau x y, FunctionType tau SetType, Application (Variable 0) $ liftBy 2 0 x] (Application (Variable 1) $ liftBy 3 0 y)
 
 \end{code}

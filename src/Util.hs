@@ -3,8 +3,8 @@ module Util where
 import System.Console.ANSI
 import Control.Applicative
 
-red s = setSGRCode [SetColor Foreground Vivid Red] ++ s ++ setSGRCode []
-blue s = setSGRCode [SetColor Foreground Vivid Blue] ++ s ++ setSGRCode []
+red s    = setSGRCode [SetColor Foreground Vivid Red] ++ s ++ setSGRCode []
+blue s   = setSGRCode [SetColor Foreground Vivid Blue] ++ s ++ setSGRCode []
 yellow s = setSGRCode [SetColor Foreground Vivid Yellow] ++ s ++ setSGRCode []
 
 subScriptInt :: Int -> String
@@ -20,3 +20,6 @@ subScriptInt i = subScriptInt' <$> show i
     subScriptInt' '7' = '₇'
     subScriptInt' '8' = '₈'
     subScriptInt' '9' = '₉'
+
+(<+>) :: String -> String -> String
+a <+> b = a ++ " " ++ b
