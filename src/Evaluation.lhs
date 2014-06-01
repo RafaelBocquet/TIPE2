@@ -142,7 +142,63 @@ normaliseHead gamma e@(CoTupleDestruct taus sigma fs)                 = return e
 normaliseHead gamma e@(IdentityType tau x y)                          = return e
 normaliseHead gamma e@(IdentityReflective tau x)                      = return e
 normaliseHead gamma e@(IdentityDestruct tau x y)                      = return e
--- normalise :: Environment -> Term -> EC Term
+
+normalise :: Environment -> Term -> EC Term
+normalise gamma e = normalise' =<< (normaliseHead gamma e)
+  where
+    normalise' e@(Variable i)                       = return e
+    normalise' (Application f t)                    = do
+      f' <- normalise gamma f
+      t' <- normalise gamma t
+      return $ Application f' t'
+    normalise' SetType                              = return SetType
+    normalise' (Abstraction tau t)                  = do
+      tau' <- normalise gamma tau
+      t' <- normalise (tau' `Env.bind` gamma) t
+      return $ Abstraction tau' t'
+    normalise' (FunctionType tau sigma)             = do
+      tau' <- normalise gamma tau
+      sigma' <- normalise (tau' `Env.bind` gamma) sigma
+      return $ FunctionType tau' sigma'
+    normalise' (TupleType taus) =
+      TupleType . snd <$> foldM (\(gamma', taus') tau -> do
+          tau' <- normalise gamma' tau
+          return (tau `Env.bind` gamma, tau' : taus') 
+        ) (gamma, []) taus
+    normalise' (TupleConstruct taus ts)             = do
+      TupleType taus' <- normalise gamma $ TupleType taus
+      ts' <- mapM (normalise gamma) ts
+      return $ TupleConstruct taus' ts'
+    normalise' (TupleDestruct taus sigma f)         = do
+      TupleType taus' <- normalise gamma $ TupleType taus
+      sigma' <- normalise (TupleType taus' `Env.bind` gamma) sigma
+      f' <- normalise gamma f
+      return $ TupleDestruct taus' sigma' f'
+    normalise' (CoTupleType taus)                   = do
+      CoTupleType <$> mapM (normalise gamma) taus
+    normalise' (CoTupleConstruct taus j t)          = do
+      CoTupleType taus' <- normalise gamma (CoTupleType taus)
+      t' <- normalise gamma t
+      return $ CoTupleConstruct taus' j t'
+    normalise' (CoTupleDestruct taus sigma fs)      = do
+      CoTupleType taus' <- normalise gamma (CoTupleType taus)
+      sigma' <- normalise (CoTupleType taus' `Env.bind` gamma) sigma
+      fs' <- mapM (normalise gamma) fs
+      return $ CoTupleDestruct taus' sigma' fs'
+    normalise' (IdentityType tau x y)               = do
+      tau' <- normalise gamma tau
+      x' <- normalise gamma x
+      y' <- normalise gamma y
+      return $ IdentityType tau' x' y'
+    normalise' (IdentityReflective tau x)           = do
+      tau' <- normalise gamma tau
+      x' <- normalise gamma x
+      return $ IdentityReflective tau' x'
+    normalise' (IdentityDestruct tau x y)           = do
+      tau' <- normalise gamma tau
+      x' <- normalise gamma x
+      y' <- normalise gamma y
+      return $ IdentityDestruct tau' x' y'
 
 -- Typechecking
 
@@ -216,15 +272,15 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
     typecheck' gamma (IdentityType tau x y)      = do
       tauTy <- typecheck gamma tau
       unify gamma tauTy SetType
-      xTy <- typecheck gamma tau
+      xTy <- typecheck gamma x
       unify gamma xTy tau
-      yTy <- typecheck gamma tau
+      yTy <- typecheck gamma y
       unify gamma yTy tau
       return SetType
     typecheck' gamma (IdentityReflective tau x)  = do
       tauTy <- typecheck gamma tau
       unify gamma tauTy SetType
-      xTy <- typecheck gamma tau
+      xTy <- typecheck gamma x
       unify gamma xTy tau
       return $ IdentityType tau x x
     typecheck' gamma (IdentityDestruct tau x y)  = do

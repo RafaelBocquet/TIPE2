@@ -21,5 +21,7 @@ subScriptInt i = subScriptInt' <$> show i
     subScriptInt' '8' = '₈'
     subScriptInt' '9' = '₉'
 
+infixl 6 <+>
+
 (<+>) :: String -> String -> String
 a <+> b = a ++ " " ++ b
