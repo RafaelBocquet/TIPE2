@@ -13,7 +13,11 @@ testTypecheck s t tau = do
 
 unitIsContractileType :: Term
 unitIsContractileType =
-  FunctionType unitType $ IdentityType unitType unitValue (Variable 0)
+  FunctionType unitType $ IdentityType unitType (Variable 0) unitValue
+
+unitIsConstractible :: Term
+unitIsConstractible =
+  Abstraction unitType $ TupleIdentity [] (Variable 0)
 
 main :: IO ()
 main = do
@@ -21,4 +25,5 @@ main = do
   testTypecheck "unitValue" unitValue unitType
   testTypecheck "refl unitValue" (IdentityReflective unitType unitValue) (IdentityType unitType unitValue unitValue)
   testTypecheck "unitIsContractileType" unitIsContractileType SetType
+  testTypecheck "unitIsContractile" unitIsConstractible unitIsContractileType
 \end{code}

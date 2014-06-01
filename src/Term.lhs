@@ -24,6 +24,7 @@ data Term =
   | TupleType [Term]
   | TupleConstruct [Term] [Term]
   | TupleDestruct [Term] Term Term
+  | TupleIdentity [Term] Term -- x : (TupleType t) = TupleDestruct . TupleConstruct x
 
   | CoTupleType [Term]
   | CoTupleConstruct [Term] Int Term
@@ -68,6 +69,8 @@ showWithEnvironment env = showWithEnvironment' 0
           "(" ++ showWithEnvironment' i t ++ ", " ++ showWithEnvironment' i (TupleConstruct taus ts) ++ ")"
     showWithEnvironment' i (TupleDestruct taus sigma f) =
           "(" ++ blue "match" <+> showWithEnvironment' i (TupleType taus) <+> red "to" <+> showWithEnvironment' (i + 1) sigma <+> red "with" <+> showWithEnvironment' i f ++ ")"
+    showWithEnvironment' i (TupleIdentity _ t) =
+          "(" ++ blue "TupleIdentity" <+> showWithEnvironment' i t ++ ")"
     showWithEnvironment' i (CoTupleType []) =
           blue "⊥"
     showWithEnvironment' i (CoTupleType (tau:taus)) =
@@ -100,6 +103,7 @@ liftBy n i (FunctionType tau sigma)             = FunctionType (liftBy n i $ tau
 liftBy n i (TupleType taus)                     = TupleType (uncurry (liftBy n) <$> zip [i..] taus)
 liftBy n i (TupleConstruct taus ts)             = TupleConstruct (uncurry (liftBy n) <$> zip [i..] taus) (liftBy n i <$> ts)
 liftBy n i (TupleDestruct taus sigma f)         = TupleDestruct (uncurry (liftBy n) <$> zip [i..] taus) (liftBy n (i + 1) $ sigma) (liftBy n i $ f)
+liftBy n i (TupleIdentity taus t)               = TupleIdentity (uncurry (liftBy n) <$> zip [i..] taus) (liftBy n i $ t)
 liftBy n i (CoTupleType taus)                   = CoTupleType (liftBy n i <$> taus)
 liftBy n i (CoTupleConstruct taus j t)          = CoTupleConstruct (liftBy n i <$> taus) j (liftBy n i $ t)
 liftBy n i (CoTupleDestruct taus sigma fs)      = CoTupleDestruct (liftBy n i <$> taus) (liftBy n (i + 1) $ sigma) (liftBy n i <$> fs)
@@ -120,6 +124,12 @@ abstractionList = flip $ foldl Abstraction
 
 functionTypeList :: [Term] -> Term -> Term
 functionTypeList = flip $ foldl FunctionType
+
+tupleProjection :: [Term] -> Int -> Term
+tupleProjection taus i =
+  TupleDestruct taus
+    (abstractionList taus . applicationList (taus !! i) $ Variable <$> (take i $ iterate (-1 +) (length taus)))
+    (abstractionList taus . Variable $ length taus - i - 1)
 
 unitType :: Term
 unitType = TupleType []

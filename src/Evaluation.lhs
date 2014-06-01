@@ -79,9 +79,16 @@ unify gamma e1 e2 = do
           tau' <- unify gamma' tau1 tau2
           return $ (tau' `Env.bind` gamma, tau' : taus')
         ) (gamma, []) (zip taus1 taus2)
-      sigma' <- unify (foldl (flip Env.bind) gamma taus') sigma1 sigma2
+      sigma' <- unify gamma sigma1 sigma2
       f' <- unify gamma f1 f2
       return $ TupleDestruct taus' sigma' f'
+    unify' gamma (TupleIdentity taus1 t1) (TupleIdentity taus2 t2)                     = do
+      taus' <- snd <$> foldM (\(gamma', taus') (tau1, tau2) -> do
+          tau' <- unify gamma' tau1 tau2
+          return $ (tau' `Env.bind` gamma, tau' : taus')
+        ) (gamma, []) (zip taus1 taus2)
+      t' <- unify gamma t1 t2
+      return $ TupleIdentity taus' t'
     unify' gamma (CoTupleType taus1) (CoTupleType taus2)                               = do
       CoTupleType <$> mapM (uncurry $ unify gamma) (zip taus1 taus2)
     unify' gamma e1@(CoTupleConstruct taus1 j1 t1) e2@(CoTupleConstruct taus2 j2 t2)
@@ -129,6 +136,8 @@ normaliseHead gamma e@(Application (CoTupleDestruct taus sigma fs) t) = do
       normaliseHead gamma $ Application (fs !! j) t
     otherwise ->
       return e
+normaliseHead gamma (Application (Application (Application (IdentityDestruct tau x y) prf) p) px) = do
+  return px
 normaliseHead gamma (Application f t)                                 = throwError $ OtherError "..."
 normaliseHead gamma SetType                                           = return SetType
 normaliseHead gamma e@(Abstraction tau t)                             = return e
@@ -136,6 +145,7 @@ normaliseHead gamma e@(FunctionType tau sigma)                        = return e
 normaliseHead gamma e@(TupleType taus)                                = return e
 normaliseHead gamma e@(TupleConstruct taus ts)                        = return e
 normaliseHead gamma e@(TupleDestruct taus sigma f)                    = return e
+normaliseHead gamma e@(TupleIdentity taus t)                          = return e
 normaliseHead gamma e@(CoTupleType taus)                              = return e
 normaliseHead gamma e@(CoTupleConstruct taus j t)                     = return e
 normaliseHead gamma e@(CoTupleDestruct taus sigma fs)                 = return e
@@ -174,6 +184,10 @@ normalise gamma e = normalise' =<< (normaliseHead gamma e)
       sigma' <- normalise (TupleType taus' `Env.bind` gamma) sigma
       f' <- normalise gamma f
       return $ TupleDestruct taus' sigma' f'
+    normalise' (TupleIdentity taus t)         = do
+      TupleType taus' <- normalise gamma $ TupleType taus
+      t' <- normalise gamma t
+      return $ TupleIdentity taus' t'
     normalise' (CoTupleType taus)                   = do
       CoTupleType <$> mapM (normalise gamma) taus
     normalise' (CoTupleConstruct taus j t)          = do
@@ -247,10 +261,14 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
     typecheck' gamma (TupleDestruct taus sigma f)      = do
       typecheck' gamma (TupleType taus)
       sigmaTy <- typecheck gamma sigma
-      unify (TupleType taus `Env.bind` gamma) sigmaTy SetType
+      unify gamma sigmaTy $ functionTypeList taus SetType
       fTy <- typecheck gamma f
       unify gamma fTy $ functionTypeList taus sigma
-      return $ FunctionType (TupleType taus) sigma 
+    typecheck' gamma (TupleIdentity taus t)      = do
+      typecheck' gamma (TupleType taus)
+      tTy <- typecheck gamma t
+      unify gamma tTy (TupleType taus)
+      return $ IdentityType (TupleType taus) t (TupleConstruct taus $ (\i -> Application (tupleProjection taus i) t) <$> [0..length taus - 1])
     typecheck' gamma (CoTupleType taus)          = do
       forM_ taus $ \tau -> do
         tauTy <- typecheck gamma tau
@@ -286,5 +304,9 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
     typecheck' gamma (IdentityDestruct tau x y)  = do
       typecheck' gamma (IdentityType tau x y)
       return $ functionTypeList [IdentityType tau x y, FunctionType tau SetType, Application (Variable 0) $ liftBy 2 0 x] (Application (Variable 1) $ liftBy 3 0 y)
+
+-- Todo : move to other module
+
+-- explore
 
 \end{code}
