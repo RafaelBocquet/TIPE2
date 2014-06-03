@@ -35,8 +35,9 @@ data Term =
   | IdentityDestruct Term Term Term
 
   -- Nat instead of inductive / coinductive types for simplicity
-  -- | NatType
-  -- | NatValue Int
+  | NatType
+  | NatZ
+  | NatS
   -- | NatInduction
   deriving (Eq)
 
@@ -45,10 +46,10 @@ showWithEnvironment env = showWithEnvironment' 0
   where
     showWithEnvironment' :: Int -> Term -> String
     showWithEnvironment' i (Variable j)
-      | j <= i                                 =
-          (yellow . show . chr) (ord 'a' + i - j)
-      | j <= i + length env                    =
-          yellow $ env !! (j - i)
+      | j < i                                 =
+          (yellow . (: []) . chr) (ord 'a' + i - j - 1)
+      | j < i + length env                    =
+          yellow $ env !! (j - i - 1)
       | otherwise                              =
           blue "E" ++ yellow (subScriptInt $ j - i - length env)
     showWithEnvironment' i (Application f t)   =
@@ -56,13 +57,13 @@ showWithEnvironment env = showWithEnvironment' 0
     showWithEnvironment' i SetType             =
           blue "U"
     showWithEnvironment' i (Abstraction tau t) =
-          "(" ++ blue "Λ" ++ "(" ++ (show . chr) (ord 'a' + i) <+> red ":" <+> showWithEnvironment' i tau ++ ")" ++ red "." <+> showWithEnvironment' (i + 1) t ++ ")"
+          "(" ++ blue "Λ" ++ "(" ++ (yellow . (: []) . chr) (ord 'a' + i) <+> red ":" <+> showWithEnvironment' i tau ++ ")" ++ red "." <+> showWithEnvironment' (i + 1) t ++ ")"
     showWithEnvironment' i (FunctionType tau sigma) =
-          "(" ++ blue "Π" ++ "(" ++ (show . chr) (ord 'a' + i) <+> red ":" <+> showWithEnvironment' i tau ++ ")" ++ red "." <+> showWithEnvironment' (i + 1) sigma ++ ")"
+          "(" ++ blue "Π" ++ "(" ++ (yellow . (: []) . chr) (ord 'a' + i) <+> red ":" <+> showWithEnvironment' i tau ++ ")" ++ red "." <+> showWithEnvironment' (i + 1) sigma ++ ")"
     showWithEnvironment' i (TupleType []) =
           blue "⊤"
     showWithEnvironment' i (TupleType (tau:taus)) =
-          "(" ++ blue "Σ" ++ "(" ++ (show . chr) (ord 'a' + i) <+> red ":" <+> showWithEnvironment' i tau ++ ")" ++ red "." <+> showWithEnvironment' (i + 1) (TupleType taus) ++ ")"
+          "(" ++ blue "Σ" ++ "(" ++ (yellow . (: []) . chr) (ord 'a' + i) <+> red ":" <+> showWithEnvironment' i tau ++ ")" ++ red "." <+> showWithEnvironment' (i + 1) (TupleType taus) ++ ")"
     showWithEnvironment' i (TupleConstruct [] []) =
           blue "()"
     showWithEnvironment' i (TupleConstruct (tau:taus) (t:ts)) =
@@ -85,9 +86,13 @@ showWithEnvironment env = showWithEnvironment' 0
           "(" ++ blue "match" <+> showWithEnvironment' i (CoTupleType taus) <+> red "to" <+> showWithEnvironment' (i + 1) sigma <+> red "with" <+> showWithEnvironment' i (CoTupleType fs) ++ ")"
     showWithEnvironment' i (IdentityType tau x y) =
           "(" ++ blue "Id" <+> showWithEnvironment' i tau <+> showWithEnvironment' i x <+> showWithEnvironment' i y ++ ")"
-
-
-
+    showWithEnvironment' i (IdentityReflective tau x) =
+          "(" ++ blue "IdR" <+> showWithEnvironment' i tau <+> showWithEnvironment' i x ++ ")"
+    showWithEnvironment' i (IdentityDestruct tau x y) =
+          "(" ++ blue "IdD" <+> showWithEnvironment' i tau <+> showWithEnvironment' i x <+> showWithEnvironment' i y ++ ")"
+    showWithEnvironment' i NatType = blue "ℕ"
+    showWithEnvironment' i NatZ = blue "Z"
+    showWithEnvironment' i NatS = blue "S"
 
 instance Show Term where
   show = showWithEnvironment []
@@ -110,6 +115,9 @@ liftBy n i (CoTupleDestruct taus sigma fs)      = CoTupleDestruct (liftBy n i <$
 liftBy n i (IdentityType tau x y)               = IdentityType (liftBy n i $ tau) (liftBy n i $ x) (liftBy n i $ y)
 liftBy n i (IdentityReflective tau x)           = IdentityReflective (liftBy n i $ tau) (liftBy n i $ x)
 liftBy n i (IdentityDestruct tau x y)           = IdentityDestruct (liftBy n i $ tau) (liftBy n i $ x) (liftBy n i $ y)
+liftBy n i NatType                              = NatType
+liftBy n i NatZ                                 = NatZ
+liftBy n i NatS                                 = NatS
 
 lift :: Term -> Term
 lift = liftBy 1 0
@@ -117,13 +125,13 @@ lift = liftBy 1 0
 -- Smart constructors
 
 applicationList :: Term -> [Term] -> Term
-applicationList = foldr Application
+applicationList = foldl Application
 
 abstractionList :: [Term] -> Term -> Term
-abstractionList = flip $ foldl Abstraction
+abstractionList = flip $ foldr Abstraction
 
 functionTypeList :: [Term] -> Term -> Term
-functionTypeList = flip $ foldl FunctionType
+functionTypeList = flip $ foldr FunctionType
 
 tupleProjection :: [Term] -> Int -> Term
 tupleProjection taus i =

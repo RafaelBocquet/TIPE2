@@ -20,9 +20,9 @@ substitute :: Substitution -> Term -> Term
 substitute (Substitution s) = substitute' 0
   where
     substitute' i (Variable j)
-      | j >= i + length s                                = Variable (j - length s)
-      | j >= i && j < i + length s                       = s !! (j - i)
-      | otherwise                                        = Variable j
+      | j >= i + length s                              = Variable (j - length s)
+      | j >= i && j < i + length s                     = liftBy i 0 $ s !! (j - i)
+      | otherwise                                      = Variable j
     substitute' i (Application f t)                    = Application (substitute' i $ f) (substitute' i $ t)
     substitute' i SetType                              = SetType
     substitute' i (Abstraction tau t)                  = Abstraction (substitute' i $ tau) (substitute' (i + 1) $ t)
@@ -36,6 +36,9 @@ substitute (Substitution s) = substitute' 0
     substitute' i (IdentityType tau x y)               = IdentityType (substitute' i $ tau) (substitute' i $ x) (substitute' i $ y)
     substitute' i (IdentityReflective tau x)           = IdentityReflective (substitute' i $ tau) (substitute' i $ x)
     substitute' i (IdentityDestruct tau x y)           = IdentityDestruct (substitute' i $ tau) (substitute' i $ x) (substitute' i $ y)
+    substitute' i NatType                              = NatType
+    substitute' i NatZ                                 = NatZ
+    substitute' i NatS                                 = NatS
 
 
 \end{code}

@@ -138,7 +138,7 @@ normaliseHead gamma e@(Application (CoTupleDestruct taus sigma fs) t) = do
       return e
 normaliseHead gamma (Application (Application (Application (IdentityDestruct tau x y) prf) p) px) = do
   return px
-normaliseHead gamma (Application f t)                                 = throwError $ OtherError "..."
+normaliseHead gamma e@(Application f t)                               = return e
 normaliseHead gamma SetType                                           = return SetType
 normaliseHead gamma e@(Abstraction tau t)                             = return e
 normaliseHead gamma e@(FunctionType tau sigma)                        = return e
@@ -152,6 +152,9 @@ normaliseHead gamma e@(CoTupleDestruct taus sigma fs)                 = return e
 normaliseHead gamma e@(IdentityType tau x y)                          = return e
 normaliseHead gamma e@(IdentityReflective tau x)                      = return e
 normaliseHead gamma e@(IdentityDestruct tau x y)                      = return e
+normaliseHead gamma NatType                                           = return NatType
+normaliseHead gamma NatZ                                              = return NatZ
+normaliseHead gamma NatS                                              = return NatS
 
 normalise :: Environment -> Term -> EC Term
 normalise gamma e = normalise' =<< (normaliseHead gamma e)
@@ -213,43 +216,46 @@ normalise gamma e = normalise' =<< (normaliseHead gamma e)
       x' <- normalise gamma x
       y' <- normalise gamma y
       return $ IdentityDestruct tau' x' y'
+    normalise' NatType                              = return NatType
+    normalise' NatZ                                 = return NatZ
+    normalise' NatS                                 = return NatS
 
 -- Typechecking
 
 typecheck :: Environment -> Term -> EC Term
 typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErrorTrace gamma t)
   where
-    typecheck' gamma (Variable i)                = do
+    typecheck' gamma (Variable i)                         = do
       maybe (throwError $ FreeVariable i) return $ lookup gamma i
-    typecheck' gamma (Application f t)           = do
+    typecheck' gamma (Application f t)                    = do
       fTy <- typecheck gamma f
       case fTy of
         FunctionType tau sigma -> do
           tTy <- typecheck gamma t
           unify gamma tTy tau
-          return sigma
+          return $ substitute (t `Subst.bind` Subst.empty) sigma
         otherwise -> throwError $ ExceptedFunction fTy
-    typecheck' gamma SetType                     = do
+    typecheck' gamma SetType                              = do
       return SetType
-    typecheck' gamma (Abstraction tau t)         = do
+    typecheck' gamma (Abstraction tau t)                  = do
       tauTy <- typecheck gamma tau
       unify gamma tauTy SetType
       tTy <- typecheck (tau `Env.bind` gamma) t
       return $ FunctionType tau tTy
-    typecheck' gamma (FunctionType tau sigma)    = do
+    typecheck' gamma (FunctionType tau sigma)             = do
       tauTy <- typecheck gamma tau
       unify gamma tauTy SetType
       sigmaTy <- typecheck (tau `Env.bind` gamma) sigma
       unify gamma sigmaTy SetType
       return SetType
-    typecheck' gamma (TupleType taus)            = do
+    typecheck' gamma (TupleType taus)                     = do
       foldM_ (\gamma' tau -> do
           tauTy <- typecheck gamma' tau
           unify gamma' tauTy SetType
           return $ tau `Env.bind` gamma
         ) gamma taus
       return SetType
-    typecheck' gamma (TupleConstruct taus ts)    = do
+    typecheck' gamma (TupleConstruct taus ts)             = do
       foldM_ (\(gamma', s)  (tau, t) -> do
           tauTy <- typecheck gamma' tau
           unify gamma' tauTy SetType
@@ -258,23 +264,23 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
           return $ (tau `Env.bind` gamma, t `Subst.bind` s)
         ) (gamma, Subst.empty) (zip taus ts)
       return $ TupleType taus
-    typecheck' gamma (TupleDestruct taus sigma f)      = do
+    typecheck' gamma (TupleDestruct taus sigma f)         = do
       typecheck' gamma (TupleType taus)
       sigmaTy <- typecheck gamma sigma
       unify gamma sigmaTy $ functionTypeList taus SetType
       fTy <- typecheck gamma f
       unify gamma fTy $ functionTypeList taus sigma
-    typecheck' gamma (TupleIdentity taus t)      = do
+    typecheck' gamma (TupleIdentity taus t)               = do
       typecheck' gamma (TupleType taus)
       tTy <- typecheck gamma t
       unify gamma tTy (TupleType taus)
       return $ IdentityType (TupleType taus) t (TupleConstruct taus $ (\i -> Application (tupleProjection taus i) t) <$> [0..length taus - 1])
-    typecheck' gamma (CoTupleType taus)          = do
+    typecheck' gamma (CoTupleType taus)                   = do
       forM_ taus $ \tau -> do
         tauTy <- typecheck gamma tau
         unify gamma tau SetType
       return SetType
-    typecheck' gamma (CoTupleConstruct taus j t) = do
+    typecheck' gamma (CoTupleConstruct taus j t)          = do
       typecheck' gamma (CoTupleType taus)
       tTy <- typecheck gamma t
       unify gamma tTy $ taus !! j
@@ -287,7 +293,7 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
         fTy <- typecheck gamma f
         unify gamma fTy $ FunctionType tau sigma
       return $ FunctionType (CoTupleType taus) $ lift sigma
-    typecheck' gamma (IdentityType tau x y)      = do
+    typecheck' gamma (IdentityType tau x y)               = do
       tauTy <- typecheck gamma tau
       unify gamma tauTy SetType
       xTy <- typecheck gamma x
@@ -295,15 +301,18 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
       yTy <- typecheck gamma y
       unify gamma yTy tau
       return SetType
-    typecheck' gamma (IdentityReflective tau x)  = do
+    typecheck' gamma (IdentityReflective tau x)           = do
       tauTy <- typecheck gamma tau
       unify gamma tauTy SetType
       xTy <- typecheck gamma x
       unify gamma xTy tau
       return $ IdentityType tau x x
-    typecheck' gamma (IdentityDestruct tau x y)  = do
+    typecheck' gamma (IdentityDestruct tau x y)           = do
       typecheck' gamma (IdentityType tau x y)
-      return $ functionTypeList [IdentityType tau x y, FunctionType tau SetType, Application (Variable 0) $ liftBy 2 0 x] (Application (Variable 1) $ liftBy 3 0 y)
+      return $ functionTypeList [IdentityType tau x y, FunctionType (lift tau) SetType, Application (Variable 0) $ liftBy 2 0 x] (Application (Variable 1) $ liftBy 3 0 y)
+    typecheck' gamma NatType                              = return SetType
+    typecheck' gamma NatZ                                 = return $ NatType
+    typecheck' gamma NatS                                 = return $ FunctionType NatType NatType
 
 -- Todo : move to other module
 
