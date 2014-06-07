@@ -38,7 +38,7 @@ data Term =
   | NatType
   | NatZ
   | NatS
-  -- | NatInduction
+  | NatInduction Term Term Term
   deriving (Eq)
 
 showWithEnvironment :: [String] -> Term -> String
@@ -93,6 +93,7 @@ showWithEnvironment env = showWithEnvironment' 0
     showWithEnvironment' i NatType = blue "ℕ"
     showWithEnvironment' i NatZ = blue "Z"
     showWithEnvironment' i NatS = blue "S"
+    showWithEnvironment' i (NatInduction tau f x) = blue "natind"
 
 instance Show Term where
   show = showWithEnvironment []
@@ -118,6 +119,7 @@ liftBy n i (IdentityDestruct tau x y)           = IdentityDestruct (liftBy n i $
 liftBy n i NatType                              = NatType
 liftBy n i NatZ                                 = NatZ
 liftBy n i NatS                                 = NatS
+liftBy n i (NatInduction tau f x)               = NatInduction (liftBy n i $ tau) (liftBy n i $ f) (liftBy n i $ x)
 
 lift :: Term -> Term
 lift = liftBy 1 0

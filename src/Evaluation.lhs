@@ -116,12 +116,17 @@ unify gamma e1 e2 = do
       x' <- unify gamma x1 x2
       y' <- unify gamma y1 y2
       return $ IdentityDestruct tau' x' y'
+    unify' gamma (NatInduction tau1 f1 x1) (NatInduction tau2 f2 x2) = do
+      tau' <- unify gamma tau1 tau2
+      f' <- unify gamma f1 f2
+      x' <- unify gamma x1 x2
+      return $ NatInduction tau' f' x'
     unify' gamma e1 e2 = throwError $ UnificationFailure gamma e1 e2
 -- Normalisation (term must be valid)
 
 normaliseHead :: Environment -> Term -> EC Term
 normaliseHead gamma (Variable i)                                      = return $ Variable i
-normaliseHead gamma (Application (Abstraction tau e) t)               = normaliseHead gamma $ substitute (t `Subst.bind` Subst.empty) e
+normaliseHead gamma (Application (Abstraction tau e) t)               = normaliseHead gamma $ substitute (Subst.single t) e
 normaliseHead gamma e@(Application (TupleDestruct taus sigma f) t)    = do
   t' <- normaliseHead gamma t
   case t' of
@@ -138,6 +143,10 @@ normaliseHead gamma e@(Application (CoTupleDestruct taus sigma fs) t) = do
       return e
 normaliseHead gamma (Application (Application (Application (IdentityDestruct tau x y) prf) p) px) = do
   return px
+normaliseHead gamma (Application e@(NatInduction tau f t) n@(Application NatS n')) = do
+  normaliseHead gamma (Application (Application f n) (Application e n'))
+normaliseHead gamma (Application (NatInduction tau f t) NatZ) = do
+  return t
 normaliseHead gamma e@(Application f t)                               = return e
 normaliseHead gamma SetType                                           = return SetType
 normaliseHead gamma e@(Abstraction tau t)                             = return e
@@ -155,6 +164,7 @@ normaliseHead gamma e@(IdentityDestruct tau x y)                      = return e
 normaliseHead gamma NatType                                           = return NatType
 normaliseHead gamma NatZ                                              = return NatZ
 normaliseHead gamma NatS                                              = return NatS
+normaliseHead gamma e@(NatInduction tau f x)                          = return e
 
 normalise :: Environment -> Term -> EC Term
 normalise gamma e = normalise' =<< (normaliseHead gamma e)
@@ -219,6 +229,11 @@ normalise gamma e = normalise' =<< (normaliseHead gamma e)
     normalise' NatType                              = return NatType
     normalise' NatZ                                 = return NatZ
     normalise' NatS                                 = return NatS
+    normalise' (NatInduction tau f x)               = do
+      tau' <- normalise (NatType `Env.bind` gamma) tau
+      f' <- normalise (NatType `Env.bind` gamma) f
+      x' <- normalise gamma x
+      return $ NatInduction tau' f' x'
 
 -- Typechecking
 
@@ -313,6 +328,14 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
     typecheck' gamma NatType                              = return SetType
     typecheck' gamma NatZ                                 = return $ NatType
     typecheck' gamma NatS                                 = return $ FunctionType NatType NatType
+    typecheck' gamma (NatInduction tau f x)               = do
+      tauTy <- typecheck gamma tau
+      unify gamma tauTy $ FunctionType NatType SetType
+      fTy <- typecheck gamma f
+      unify gamma fTy $ functionTypeList [NatType, Application (lift tau) (Variable 0)] $ Application (liftBy 2 0 tau) $ Application NatS (Variable 1)
+      xTy <- typecheck gamma x
+      unify gamma xTy $ Application tau NatZ
+      return $ FunctionType NatType $ Application tau (Variable 0)
 
 -- Todo : move to other module
 

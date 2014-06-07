@@ -4,7 +4,7 @@ module Substitution where
 import Term
 
 import Prelude hiding (lookup)
-import Control.Applicative
+import Control.Applicative hiding (empty)
 
 newtype Substitution = Substitution [Term]
   deriving(Eq, Show)
@@ -15,6 +15,8 @@ empty = Substitution []
 bind :: Term -> Substitution -> Substitution
 e `bind` (Substitution env) = Substitution $ e : env
 
+single :: Term -> Substitution
+single t = t `bind` empty
 
 substitute :: Substitution -> Term -> Term
 substitute (Substitution s) = substitute' 0
@@ -39,6 +41,7 @@ substitute (Substitution s) = substitute' 0
     substitute' i NatType                              = NatType
     substitute' i NatZ                                 = NatZ
     substitute' i NatS                                 = NatS
+    substitute' i (NatInduction tau f x)               = NatInduction (substitute' i $ tau) (substitute' i $ f) (substitute' i $ x)
 
 
 \end{code}

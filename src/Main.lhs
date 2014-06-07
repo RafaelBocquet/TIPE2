@@ -72,6 +72,28 @@ idC =
 one :: Term
 one = Application NatS NatZ
 
+indSuccIsNatType' = IdentityType NatType (Variable 0) (Application (NatInduction (Abstraction NatType NatType) (Abstraction NatType NatS) NatZ) (Variable 0))
+
+indSuccIsNatType :: Term
+indSuccIsNatType =
+  FunctionType NatType $ indSuccIsNatType'
+
+indSuccIsNat :: Term
+indSuccIsNat =
+  NatInduction
+    (Abstraction NatType $ indSuccIsNatType')
+    (Abstraction NatType $ Abstraction indSuccIsNatType' $
+      applicationList idC
+      [ NatType
+      , Variable 1
+      , Application (NatInduction (Abstraction NatType NatType) (Abstraction NatType NatS) NatZ) (Variable 1)
+      , Variable 0
+      , NatType
+      , NatS
+      ]
+    )
+    (IdentityReflective NatType NatZ)
+
 main :: IO ()
 main = do
   putStrLn $ red "Tipe 2"
@@ -84,4 +106,6 @@ main = do
   testTypecheck "idCType" idCType SetType
   testTypecheck "idC" idC idCType
   testTypecheck "one" one NatType
+  testTypecheck "indSuccIsNatType" indSuccIsNatType SetType
+  testTypecheck "indSuccIsNat" indSuccIsNat indSuccIsNatType
 \end{code}
