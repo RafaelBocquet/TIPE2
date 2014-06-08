@@ -30,10 +30,6 @@ data ProofBase = ProofBase
 instance Show ProofBase where
   show (ProofBase bFull _) = mconcat $ (\(key,dat) -> "\n" ++ show key <+> mconcat (("\n\t" ++) . show . snd <$> dat)) <$> Map.toList bFull
 
---insertProofSearch :: ProofBase -> ProofSearch -> ProofBase
---insertProofSearch (ProofBase bFull bSkel) (ProofSearch t (Environment env)) =
---  let env' = 
-
 empty :: ProofBase
 empty = ProofBase Map.empty Map.empty
 
@@ -44,7 +40,6 @@ insertProofItem item@(ProofSearchItem env t) prf base@(ProofBase bFull bSkel) =
   let pEnv = isomorphismMemberType <$> env in
   let lIndex = maybe 0 length $ Map.lookup pTerm bFull in
   let prf' = Application (isomorphismTo pIsom) prf in
-  -- traceShow (runEC $ typecheck Env.empty prf') $
   let fEntry = (prf', pEnv) in
   let sEntry = (pTerm, lIndex, skeleton <$> pEnv) in
   ProofBase
@@ -68,10 +63,10 @@ insertProof prop proof base =
       Left err -> traceShow err $ base
     Left err -> traceShow err $ base
 
-lookupProof :: Term -> ProofBase -> Maybe Term
-lookupProof _ _ = Nothing
-
 insertProofList :: ProofBase -> [(Term, Term)] -> ProofBase
 insertProofList = foldr (uncurry insertProof)
+
+lookupProof :: Term -> ProofBase -> Maybe Term
+lookupProof _ _ = Nothing
 
 \end{code}
