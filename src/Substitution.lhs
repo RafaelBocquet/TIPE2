@@ -23,7 +23,7 @@ substitute (Substitution s) = substitute' 0
   where
     substitute' i (Variable j)
       | j >= i + length s                              = Variable (j - length s)
-      | j >= i && j < i + length s                     = liftBy i 0 $ s !! (j - i)
+      | j >= i && j < i + length s                     = liftBy i $ s !! (j - i)
       | otherwise                                      = Variable j
     substitute' i (Application f t)                    = Application (substitute' i $ f) (substitute' i $ t)
     substitute' i SetType                              = SetType

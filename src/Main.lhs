@@ -4,7 +4,7 @@ module Main where
 import Term as T
 import Environment as Env
 import Evaluation as Eval
-import ProofBase as PB 
+--import ProofBase as PB 
 import ProofSearch as PS
 
 import Util
@@ -103,21 +103,24 @@ indSuccIsNat =
 proj1Type :: Term
 proj1Type = functionTypeList [SetType, SetType, TupleType [Variable 1, Variable 1]] $ Variable 2
 
+--proj1 :: Term
+--proj1 = abstractionList [SetType, SetType, TupleType [Variable 1, Variable 1]] $
+--  Application (TupleDestruct [Variable 2, Variable 2] (Variable 3) (abstractionList [Variable 2, Variable 2] $ Variable 1)) (Variable 0)
+
 proj1 :: Term
-proj1 = abstractionList [SetType, SetType, TupleType [Variable 1, Variable 1]] $
-  Application (TupleDestruct [Variable 2, Variable 2] (Variable 3) (abstractionList [Variable 2, Variable 2] $ Variable 1)) (Variable 0)
+proj1 = abstractionList [SetType, SetType] $ tupleProjection [Variable 1, Variable 1] 0
 
 decidable :: Term
 decidable = Abstraction SetType $ CoTupleType [Variable 0, T.negate $ Variable 0]
 
-mainBase :: ProofBase
-mainBase = insertProofList PB.empty
-  [ (unitIsUniqueType, unitIsUnique)
-  , (idSymmetricType, idSymmetric)
-  , (idCType, idC)
-  , (indSuccIsNatType, indSuccIsNat)
-  , (proj1Type, proj1)
-  ]
+--mainBase :: ProofBase
+--mainBase = insertProofList PB.empty
+--  [ (unitIsUniqueType, unitIsUnique)
+--  , (idSymmetricType, idSymmetric)
+--  , (idCType, idC)
+--  , (indSuccIsNatType, indSuccIsNat)
+--  , (proj1Type, proj1)
+--  ]
 
 main :: IO ()
 main = do
@@ -144,5 +147,5 @@ main = do
   testProofSearch "indSuccIsNatType" indSuccIsNatType
 
   putStrLn $ blue " --- ProofBase --- "
-  putStrLn $ show mainBase
+  --putStrLn $ show mainBase
 \end{code}

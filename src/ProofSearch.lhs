@@ -59,6 +59,18 @@ data ProofSearchItem = ProofSearchItem
 data ProofSearch = ProofSearch TypeIsomorphism [ProofSearchItem]
   deriving (Show)
 
+--instance Monoid ProofSearch where
+--  mempty = ProofSearch (trivialIsomorphism unitType) []
+--  mappend (ProofSearch isom1 l1) (ProofSearch isom2 l2) =
+--    let le1 = length l1 in
+--    let le2 = length l2 in
+--    flip ProofSearch (l1 ++ l2) $
+--      TypeIsomorphism
+--        ()
+--        (TupleType $ uncurry liftBy <$> zip [0..] (l1 ++ l2))
+--        ()
+--        ()
+
 makeProofSearchItem :: Environment -> Term -> ProofSearchItem
 makeProofSearchItem gamma t = ProofSearchItem [] (trivialIsomorphism SetType)
 
@@ -72,13 +84,13 @@ proofSearchItemIsomorphism (ProofSearchItem env t) =
     e'
     ( Abstraction e $
         abstractionList (lift . isomorphismMemberType <$> env) $
-          Application (liftBy (le+1) 0 $ isomorphismTo t) $
-            applicationList (Variable le) (uncurry Application <$> zip (liftBy (le+1) 0 . isomorphismFrom <$> env) (Variable <$> reverse [0..le-1]))
+          Application (liftBy (le+1) $ isomorphismTo t) $
+            applicationList (Variable le) (uncurry Application <$> zip (liftBy (le+1) . isomorphismFrom <$> env) (Variable <$> reverse [0..le-1]))
     )
     ( Abstraction e $
         abstractionList (lift . isomorphismMemberType <$> env) $
-          Application (liftBy (le+1) 0 $ isomorphismTo t) $
-            applicationList (Variable le) (uncurry Application <$> zip (liftBy (le+1) 0 . isomorphismTo <$> env) (Variable <$> reverse [0..le-1]))
+          Application (liftBy (le+1) $ isomorphismTo t) $
+            applicationList (Variable le) (uncurry Application <$> zip (liftBy (le+1) . isomorphismTo <$> env) (Variable <$> reverse [0..le-1]))
     )
 
 makeProofSearch :: Environment -> Term -> ProofSearch
@@ -98,8 +110,9 @@ proofSearch :: Environment -> Term -> PC ProofSearch
 proofSearch = proofSearch' 
   where
     proofSearch' gamma (FunctionType tau sigma)   =
-      let gammas = tau `proofSearchBind` gamma in
-      liftM mconcat $ (\(i, gamma') -> proofSearch gamma' $ liftBy i 0 sigma) `mapM` gammas
+      let gamma' = tau `Env.bind` gamma in
+      proofSearch' gamma' sigma
+      -- liftM mconcat $ (\(i, gamma') -> proofSearch gamma' $ liftBy i sigma) `mapM` gammas
     proofSearch' gamma e@(Application f t)        = return $ makeProofSearch gamma e
     proofSearch' gamma e@(Variable j)             = return $ makeProofSearch gamma e
     proofSearch' gamma e@SetType                  = return $ makeProofSearch gamma e
@@ -109,17 +122,17 @@ proofSearch = proofSearch'
     proofSearch' gamma e@NatType                  = return $ makeProofSearch gamma e
     proofSearch' gamma _                          = throwError $ OtherError ""
 
-    proofSearchBind :: Term -> Environment -> [(Int, Environment)]
-    proofSearchBind t@(TupleType []) gamma        = [(0, t `Env.bind` gamma)]
-    proofSearchBind (TupleType taus) gamma        =
-      foldr (\tau gammas ->
-        mconcat $ (\(i, gamma') -> update1 (i+1) <$> (liftBy i 0 tau) `proofSearchBind` gamma') <$> gammas
-      ) [(-1, gamma)] taus
-    proofSearchBind t gamma                       =
-      [(0, t `Env.bind` gamma)]
+    --proofSearchBind :: Term -> Environment -> [(Int, Environment)]
+    --proofSearchBind t@(TupleType []) gamma        = [(0, t `Env.bind` gamma)]
+    --proofSearchBind (TupleType taus) gamma        =
+    --  foldr (\tau gammas ->
+    --    mconcat $ (\(i, gamma') -> update1 (i+1) <$> (liftBy i tau) `proofSearchBind` gamma') <$> gammas
+    --  ) [(-1, gamma)] taus
+    --proofSearchBind t gamma                       =
+    --  [(0, t `Env.bind` gamma)]
 
-    update1 :: Int -> (Int, Environment) -> (Int, Environment)
-    update1 j (i, gamma) = (i+j, gamma)
+    --update1 :: Int -> (Int, Environment) -> (Int, Environment)
+    --update1 j (i, gamma) = (i+j, gamma)
 
 -- Isomorphisms
 

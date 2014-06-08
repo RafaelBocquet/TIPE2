@@ -61,6 +61,7 @@ unify gamma e1 e2 = do
       return $ Abstraction tau' t'
     unify' gamma (FunctionType tau1 sigma1) (FunctionType tau2 sigma2)                 = do
       tau' <- unify gamma tau1 tau2
+
       sigma' <- unify (tau' `Env.bind` gamma) sigma1 sigma2
       return $ FunctionType tau' sigma'
     unify' gamma (TupleType taus1) (TupleType taus2)                                   = do
@@ -125,46 +126,48 @@ unify gamma e1 e2 = do
 -- Normalisation (term must be valid)
 
 normaliseHead :: Environment -> Term -> EC Term
-normaliseHead gamma (Variable i)                                      = return $ Variable i
-normaliseHead gamma (Application (Abstraction tau e) t)               = normaliseHead gamma $ substitute (Subst.single t) e
-normaliseHead gamma e@(Application (TupleDestruct taus sigma f) t)    = do
+normaliseHead gamma (Variable i)                                                                  = return $ Variable i
+normaliseHead gamma (Application (Abstraction tau e) t)                                           = traceShow e $ traceShow t $ normaliseHead gamma $ substitute (Subst.single t) e
+normaliseHead gamma e@(Application p@(TupleDestruct taus sigma f) t)                                = do
   t' <- normaliseHead gamma t
   case t' of
     TupleConstruct _ ts ->
       normaliseHead gamma $ applicationList f ts
     otherwise ->
-      return e
-normaliseHead gamma e@(Application (CoTupleDestruct taus sigma fs) t) = do
+      normaliseHead gamma $ applicationList f $ (flip Application t' . tupleProjection taus) <$> [0 .. length taus - 1]
+normaliseHead gamma e@(Application (CoTupleDestruct taus sigma fs) t)                             = do
   t' <- normaliseHead gamma t
   case t' of
     CoTupleConstruct _ j t ->
       normaliseHead gamma $ Application (fs !! j) t
     otherwise ->
       return e
-normaliseHead gamma (Application (Application (Application (IdentityDestruct tau x y) prf) p) px) = do
-  return px
-normaliseHead gamma (Application e@(NatInduction tau f t) n@(Application NatS n')) = do
+normaliseHead gamma (Application (Application (Application (IdentityDestruct tau x y) prf) p) px) = normaliseHead gamma px
+normaliseHead gamma (Application e@(NatInduction tau f t) n@(Application NatS n'))                = do
   normaliseHead gamma (Application (Application f n) (Application e n'))
-normaliseHead gamma (Application (NatInduction tau f t) NatZ) = do
-  return t
-normaliseHead gamma e@(Application f t)                               = return e
-normaliseHead gamma SetType                                           = return SetType
-normaliseHead gamma e@(Abstraction tau t)                             = return e
-normaliseHead gamma e@(FunctionType tau sigma)                        = return e
-normaliseHead gamma e@(TupleType taus)                                = return e
-normaliseHead gamma e@(TupleConstruct taus ts)                        = return e
-normaliseHead gamma e@(TupleDestruct taus sigma f)                    = return e
-normaliseHead gamma e@(TupleIdentity taus t)                          = return e
-normaliseHead gamma e@(CoTupleType taus)                              = return e
-normaliseHead gamma e@(CoTupleConstruct taus j t)                     = return e
-normaliseHead gamma e@(CoTupleDestruct taus sigma fs)                 = return e
-normaliseHead gamma e@(IdentityType tau x y)                          = return e
-normaliseHead gamma e@(IdentityReflective tau x)                      = return e
-normaliseHead gamma e@(IdentityDestruct tau x y)                      = return e
-normaliseHead gamma NatType                                           = return NatType
-normaliseHead gamma NatZ                                              = return NatZ
-normaliseHead gamma NatS                                              = return NatS
-normaliseHead gamma e@(NatInduction tau f x)                          = return e
+normaliseHead gamma (Application (NatInduction tau f t) NatZ)                                     = normaliseHead gamma t
+normaliseHead gamma e@(Application f t)                                                           = do
+  f' <- normaliseHead gamma f
+  if f' /= f
+    then normaliseHead gamma (Application f' t)
+    else return e
+normaliseHead gamma SetType                                                                       = return SetType
+normaliseHead gamma e@(Abstraction tau t)                                                         = return e
+normaliseHead gamma e@(FunctionType tau sigma)                                                    = return e
+normaliseHead gamma e@(TupleType taus)                                                            = return e
+normaliseHead gamma e@(TupleConstruct taus ts)                                                    = return e
+normaliseHead gamma e@(TupleDestruct taus sigma f)                                                = return e
+normaliseHead gamma e@(TupleIdentity taus t)                                                      = return e
+normaliseHead gamma e@(CoTupleType taus)                                                          = return e
+normaliseHead gamma e@(CoTupleConstruct taus j t)                                                 = return e
+normaliseHead gamma e@(CoTupleDestruct taus sigma fs)                                             = return e
+normaliseHead gamma e@(IdentityType tau x y)                                                      = return e
+normaliseHead gamma e@(IdentityReflective tau x)                                                  = return e
+normaliseHead gamma e@(IdentityDestruct tau x y)                                                  = return e
+normaliseHead gamma NatType                                                                       = return NatType
+normaliseHead gamma NatZ                                                                          = return NatZ
+normaliseHead gamma NatS                                                                          = return NatS
+normaliseHead gamma e@(NatInduction tau f x)                                                      = return e
 
 normalise :: Environment -> Term -> EC Term
 normalise gamma e = normalise' =<< (normaliseHead gamma e)
@@ -287,7 +290,7 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
       unify (TupleType taus `Env.bind` gamma) sigmaTy SetType
       fTy <- typecheck gamma f
       unify gamma fTy $ functionTypeList taus $
-        Application (liftBy (length taus) 0 $ sigmaF) $ TupleConstruct (liftBy (length taus) 0 <$> taus) (Variable <$> reverse [0 .. length taus - 1])
+        Application (liftBy (length taus) $ sigmaF) $ TupleConstruct (liftListBy (length taus) taus) (Variable <$> reverse [0 .. length taus - 1])
       return $ FunctionType (TupleType taus) sigma
     typecheck' gamma (TupleIdentity taus t)               = do
       typecheck' gamma (TupleType taus)
@@ -328,7 +331,7 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
       return $ IdentityType tau x x
     typecheck' gamma (IdentityDestruct tau x y)           = do
       typecheck' gamma (IdentityType tau x y)
-      return $ functionTypeList [IdentityType tau x y, FunctionType (lift tau) SetType, Application (Variable 0) $ liftBy 2 0 x] (Application (Variable 1) $ liftBy 3 0 y)
+      return $ functionTypeList [IdentityType tau x y, FunctionType (lift tau) SetType, Application (Variable 0) $ liftBy 2 x] (Application (Variable 1) $ liftBy 3 y)
     typecheck' gamma NatType                              = return SetType
     typecheck' gamma NatZ                                 = return $ NatType
     typecheck' gamma NatS                                 = return $ FunctionType NatType NatType
@@ -336,7 +339,7 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
       tauTy <- typecheck gamma tau
       unify gamma tauTy $ FunctionType NatType SetType
       fTy <- typecheck gamma f
-      unify gamma fTy $ functionTypeList [NatType, Application (lift tau) (Variable 0)] $ Application (liftBy 2 0 tau) $ Application NatS (Variable 1)
+      unify gamma fTy $ functionTypeList [NatType, Application (lift tau) (Variable 0)] $ Application (liftBy 2 tau) $ Application NatS (Variable 1)
       xTy <- typecheck gamma x
       unify gamma xTy $ Application tau NatZ
       return $ FunctionType NatType $ Application tau (Variable 0)

@@ -16,7 +16,7 @@ bind :: Term -> Environment -> Environment
 e `bind` (Environment env) = Environment $ e : env
 
 lookup :: Environment -> Int -> Maybe Term
-lookup (Environment env) i = liftBy (i + 1) 0 <$> lookup' env i
+lookup (Environment env) i = liftBy (i + 1) <$> lookup' env i
   where
     lookup' [] _     = Nothing
     lookup' (x:_) 0  = Just x

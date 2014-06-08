@@ -10,13 +10,16 @@ executable tipe2
   other-modules:       Term,
                        Environment,
                        Evaluation,
-                       ProofSearch
+                       ProofSearch,
+                       ProofBase
   build-depends:       base >=4.6,
                        containers,
                        mtl,
                        transformers,
                        either,
                        ansi-terminal,
-                       dotgen
+                       dotgen,
+                       hscolour,
+                       ipprint
   hs-source-dirs:      src
   default-language:    Haskell2010

@@ -151,31 +151,40 @@ showWithEnvironment env = showWithEnvironment' 0
 instance Show Term where
   show = showWithEnvironment []
 
-liftBy :: Int -> Int -> Term -> Term
-liftBy n i (Variable j)
+liftBy' :: Int -> Int -> Term -> Term
+liftBy' n i (Variable j)
   | j >= i                                      = Variable (j + n)
   | otherwise                                   = Variable j
-liftBy n i (Application f t)                    = Application (liftBy n i $ f) (liftBy n i $ t)
-liftBy n i SetType                              = SetType
-liftBy n i (Abstraction tau t)                  = Abstraction (liftBy n i $ tau) (liftBy n (i + 1) $ t)
-liftBy n i (FunctionType tau sigma)             = FunctionType (liftBy n i $ tau) (liftBy n (i + 1) $ sigma)
-liftBy n i (TupleType taus)                     = TupleType (uncurry (liftBy n) <$> zip [i..] taus)
-liftBy n i (TupleConstruct taus ts)             = TupleConstruct (uncurry (liftBy n) <$> zip [i..] taus) (liftBy n i <$> ts)
-liftBy n i (TupleDestruct taus sigma f)         = TupleDestruct (uncurry (liftBy n) <$> zip [i..] taus) (liftBy n (i + 1) $ sigma) (liftBy n i $ f)
-liftBy n i (TupleIdentity taus t)               = TupleIdentity (uncurry (liftBy n) <$> zip [i..] taus) (liftBy n i $ t)
-liftBy n i (CoTupleType taus)                   = CoTupleType (liftBy n i <$> taus)
-liftBy n i (CoTupleConstruct taus j t)          = CoTupleConstruct (liftBy n i <$> taus) j (liftBy n i $ t)
-liftBy n i (CoTupleDestruct taus sigma fs)      = CoTupleDestruct (liftBy n i <$> taus) (liftBy n (i + 1) $ sigma) (liftBy n i <$> fs)
-liftBy n i (IdentityType tau x y)               = IdentityType (liftBy n i $ tau) (liftBy n i $ x) (liftBy n i $ y)
-liftBy n i (IdentityReflective tau x)           = IdentityReflective (liftBy n i $ tau) (liftBy n i $ x)
-liftBy n i (IdentityDestruct tau x y)           = IdentityDestruct (liftBy n i $ tau) (liftBy n i $ x) (liftBy n i $ y)
-liftBy n i NatType                              = NatType
-liftBy n i NatZ                                 = NatZ
-liftBy n i NatS                                 = NatS
-liftBy n i (NatInduction tau f x)               = NatInduction (liftBy n i $ tau) (liftBy n i $ f) (liftBy n i $ x)
+liftBy' n i (Application f t)                    = Application (liftBy' n i $ f) (liftBy' n i $ t)
+liftBy' n i SetType                              = SetType
+liftBy' n i (Abstraction tau t)                  = Abstraction (liftBy' n i $ tau) (liftBy' n (i + 1) $ t)
+liftBy' n i (FunctionType tau sigma)             = FunctionType (liftBy' n i $ tau) (liftBy' n (i + 1) $ sigma)
+liftBy' n i (TupleType taus)                     = TupleType (uncurry (liftBy' n) <$> zip [i..] taus)
+liftBy' n i (TupleConstruct taus ts)             = TupleConstruct (uncurry (liftBy' n) <$> zip [i..] taus) (liftBy' n i <$> ts)
+liftBy' n i (TupleDestruct taus sigma f)         = TupleDestruct (uncurry (liftBy' n) <$> zip [i..] taus) (liftBy' n (i + 1) $ sigma) (liftBy' n i $ f)
+liftBy' n i (TupleIdentity taus t)               = TupleIdentity (uncurry (liftBy' n) <$> zip [i..] taus) (liftBy' n i $ t)
+liftBy' n i (CoTupleType taus)                   = CoTupleType (liftBy' n i <$> taus)
+liftBy' n i (CoTupleConstruct taus j t)          = CoTupleConstruct (liftBy' n i <$> taus) j (liftBy' n i $ t)
+liftBy' n i (CoTupleDestruct taus sigma fs)      = CoTupleDestruct (liftBy' n i <$> taus) (liftBy' n (i + 1) $ sigma) (liftBy' n i <$> fs)
+liftBy' n i (IdentityType tau x y)               = IdentityType (liftBy' n i $ tau) (liftBy' n i $ x) (liftBy' n i $ y)
+liftBy' n i (IdentityReflective tau x)           = IdentityReflective (liftBy' n i $ tau) (liftBy' n i $ x)
+liftBy' n i (IdentityDestruct tau x y)           = IdentityDestruct (liftBy' n i $ tau) (liftBy' n i $ x) (liftBy' n i $ y)
+liftBy' n i NatType                              = NatType
+liftBy' n i NatZ                                 = NatZ
+liftBy' n i NatS                                 = NatS
+liftBy' n i (NatInduction tau f x)               = NatInduction (liftBy' n i $ tau) (liftBy' n i $ f) (liftBy' n i $ x)
+
+liftBy :: Int -> Term -> Term
+liftBy n = liftBy' n 0
+
+liftListBy :: Int -> [Term] -> [Term]
+liftListBy n ts = uncurry (liftBy' n) <$> zip [0..] ts
 
 lift :: Term -> Term
-lift = liftBy 1 0
+lift = liftBy 1
+
+liftList :: [Term] -> [Term]
+liftList = liftListBy 1
 
 -- Smart constructors
 
@@ -187,12 +196,6 @@ abstractionList = flip $ foldr Abstraction
 
 functionTypeList :: [Term] -> Term -> Term
 functionTypeList = flip $ foldr FunctionType
-
-tupleProjection :: [Term] -> Int -> Term
-tupleProjection taus i =
-  TupleDestruct taus
-    (abstractionList taus . applicationList (taus !! i) $ Variable <$> (take i $ iterate (-1 +) (length taus)))
-    (abstractionList taus . Variable $ length taus - i - 1)
 
 unitType :: Term
 unitType = TupleType []
@@ -231,5 +234,13 @@ idCong =
     , Abstraction (Variable 5) (IdentityType (Variable 2) (Application (Variable 1) (Variable 5)) (Application (Variable 1) (Variable 0)))
     , IdentityReflective (Variable 1) (Application (Variable 0) (Variable 4))
     ]
+
+tupleProjection :: [Term] -> Int -> Term
+tupleProjection taus j =
+  let lt = length taus in
+  TupleDestruct
+    taus
+    (Application (TupleDestruct (liftList taus) SetType $ abstractionList (liftList taus) $ liftBy (1+lt) $ taus !! j) (Variable 0))
+    (abstractionList taus $ Variable (lt-1-j))
 
 \end{code}

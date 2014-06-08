@@ -34,8 +34,20 @@ data ProofBase = ProofBase
 empty :: ProofBase
 empty = ProofBase Map.empty Map.empty
 
-insertProof :: ProofBase -> Term -> Term -> ProofBase
-insertProof base@(ProofBase bFull bSkel) prop proof =
+insertProofItem :: ProofSearchItem -> Term -> ProofBase -> ProofBase
+insertProofItem item@(ProofSearchItem env t) prf base@(ProofBase bFull bSkel) =
+  let pIsom = proofSearchItemIsomorphism item in
+  let pTerm = isomorphismMemberType t in
+  let pEnv = isomorphismMemberType <$> env in
+  let lIndex = maybe 0 length $ Map.lookup pTerm bFull in
+  let fEntry = (Application (isomorphismTo pIsom) prf, pEnv) in
+  let sEntry = (pTerm, lIndex, skeleton <$> pEnv) in
+  ProofBase
+    (Map.alter (Just . maybe [fEntry] (++ [fEntry])) pTerm bFull)
+    (Map.alter (Just . maybe [sEntry] (++ [sEntry])) (skeleton pTerm) bSkel)
+
+insertProof :: Term -> Term -> ProofBase -> ProofBase
+insertProof prop proof base =
   case runEC $ do
     propTy <- typecheck Env.empty prop
     unify Env.empty propTy SetType
@@ -45,15 +57,13 @@ insertProof base@(ProofBase bFull bSkel) prop proof =
     return prop'
   of
     Right prop' -> case runPC $ proofSearch Env.empty prop' of
-      Right (ProofSearch pEnv (ProofTerm pTerm _)) ->
-        let lIndex = maybe 0 length $ Map.lookup pTerm bFull in
-        let fEntry = proofTermTerm <$> pEnv in
-        let sEntry = [pTerm, 0, skeleton . proofTermTerm <$> pEnv] in
-        ProofBase
-          (Map.alter (maybe fEntry (++ fEntry)) pTerm bFull)
-          (Map.alter (maybe sEntry (++ sEntry)) (skeleton pTerm) bSkel)
+      Right (ProofSearch _ pItems) ->
+        foldr insertProofItem base pItems -- TupleProjecttion + zip
       Left err -> traceShow err $ base
     Left err -> traceShow err $ base
+
+lookupProof :: Term -> ProofBase -> Maybe Term
+lookupProof _ _ = Nothing
 
 insertProofList :: ProofBase -> [(Term, Term)] -> ProofBase
 insertProofList = foldr (\(prop, proof) base -> insertProof base prop proof)
