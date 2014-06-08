@@ -1,9 +1,11 @@
 \begin{code}
 module Main where
 
-import Term
+import Term as T
 import Environment as Env
-import Evaluation
+import Evaluation as Eval
+import ProofBase as PB 
+import ProofSearch as PS
 
 import Util
 
@@ -13,12 +15,16 @@ testTypecheck :: String -> Term -> Term -> IO ()
 testTypecheck s t tau = do
   putStrLn . either ((yellow s <+> ":" <+>) . show) ((yellow s <+> ":" <+>) . show . runEC . (unify Env.empty tau <=< normalise Env.empty)) . runEC . typecheck Env.empty $ t
 
-unitIsContractibleType :: Term
-unitIsContractibleType =
+testProofSearch :: String -> Term -> IO ()
+testProofSearch s tau = do
+  putStrLn . (yellow s <+> ":" <+>) . show . runPC . proofSearch Env.empty $ tau
+
+unitIsUniqueType :: Term
+unitIsUniqueType =
   FunctionType unitType $ IdentityType unitType (Variable 0) unitValue
 
-unitIsConstractible :: Term
-unitIsConstractible =
+unitIsUnique :: Term
+unitIsUnique =
   Abstraction unitType $ TupleIdentity [] (Variable 0)
 
 idSymmetricType :: Term
@@ -94,13 +100,32 @@ indSuccIsNat =
     )
     (IdentityReflective NatType NatZ)
 
+proj1Type :: Term
+proj1Type = functionTypeList [SetType, SetType, TupleType [Variable 1, Variable 1]] $ Variable 2
+
+proj1 :: Term
+proj1 = abstractionList [SetType, SetType, TupleType [Variable 1, Variable 1]] $
+  Application (TupleDestruct [Variable 2, Variable 2] (Variable 3) (abstractionList [Variable 2, Variable 2] $ Variable 1)) (Variable 0)
+
+decidable :: Term
+decidable = Abstraction SetType $ CoTupleType [Variable 0, T.negate $ Variable 0]
+
+mainBase :: ProofBase
+mainBase = insertProofList PB.empty
+  [ (unitIsUniqueType, unitIsUnique)
+  , (idSymmetricType, idSymmetric)
+  , (idCType, idC)
+  , (indSuccIsNatType, indSuccIsNat)
+  , (proj1Type, proj1)
+  ]
+
 main :: IO ()
 main = do
   putStrLn $ red "Tipe 2"
   testTypecheck "unitValue" unitValue unitType
   testTypecheck "refl unitValue" (IdentityReflective unitType unitValue) (IdentityType unitType unitValue unitValue)
-  testTypecheck "unitIsContractibleType" unitIsContractibleType SetType
-  testTypecheck "unitIsContractible" unitIsConstractible unitIsContractibleType
+  testTypecheck "unitIsUniqueType" unitIsUniqueType SetType
+  testTypecheck "unitIsUnique" unitIsUnique unitIsUniqueType
   testTypecheck "idSymmetricType" idSymmetricType SetType
   testTypecheck "idSymmetric" idSymmetric idSymmetricType
   testTypecheck "idCType" idCType SetType
@@ -108,4 +133,16 @@ main = do
   testTypecheck "one" one NatType
   testTypecheck "indSuccIsNatType" indSuccIsNatType SetType
   testTypecheck "indSuccIsNat" indSuccIsNat indSuccIsNatType
+  testTypecheck "proj1Type" proj1Type SetType
+  testTypecheck "proj1" proj1 proj1Type
+
+  putStrLn $ blue " --- ProofSearch --- "
+
+  testProofSearch "proj1Type" proj1Type
+  testProofSearch "idSymmetricType" idSymmetricType
+  testProofSearch "idCType" idCType
+  testProofSearch "indSuccIsNatType" indSuccIsNatType
+
+  putStrLn $ blue " --- ProofBase --- "
+  putStrLn $ show mainBase
 \end{code}

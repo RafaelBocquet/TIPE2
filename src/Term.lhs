@@ -39,7 +39,59 @@ data Term =
   | NatZ
   | NatS
   | NatInduction Term Term Term
-  deriving (Eq)
+  deriving (Eq, Ord)
+
+-- TermSkeleton
+
+data TermSkeleton =
+    SVariable
+  | SApplication TermSkeleton TermSkeleton
+
+  | SSetType
+
+  | SAbstraction TermSkeleton TermSkeleton
+  | SFunctionType TermSkeleton TermSkeleton
+
+  | STupleType [TermSkeleton]
+  | STupleConstruct [TermSkeleton] [TermSkeleton]
+  | STupleDestruct [TermSkeleton] TermSkeleton TermSkeleton
+  | STupleIdentity [TermSkeleton] TermSkeleton
+
+  | SCoTupleType [TermSkeleton]
+  | SCoTupleConstruct [TermSkeleton] Int TermSkeleton
+  | SCoTupleDestruct [TermSkeleton] TermSkeleton [TermSkeleton]
+
+  | SIdentityType TermSkeleton TermSkeleton TermSkeleton
+  | SIdentityReflective TermSkeleton TermSkeleton
+  | SIdentityDestruct TermSkeleton TermSkeleton TermSkeleton
+
+  | SNatType
+  | SNatZ
+  | SNatS
+  | SNatInduction TermSkeleton TermSkeleton TermSkeleton
+  deriving (Eq, Ord, Show)
+
+skeleton :: Term -> TermSkeleton
+skeleton (Variable i) = SVariable
+skeleton (Application f t)                    = SApplication (skeleton $ f) (skeleton $ t)
+skeleton SetType                              = SSetType
+skeleton (Abstraction tau t)                  = SAbstraction (skeleton $ tau) (skeleton $ t)
+skeleton (FunctionType tau sigma)             = SFunctionType (skeleton $ tau) (skeleton $ sigma)
+skeleton (TupleType taus)                     = STupleType (skeleton <$> taus)
+skeleton (TupleConstruct taus ts)             = STupleConstruct (skeleton <$> taus) (skeleton <$> ts)
+skeleton (TupleDestruct taus sigma f)         = STupleDestruct (skeleton <$> taus) (skeleton $ sigma) (skeleton $ f)
+skeleton (TupleIdentity taus t)               = STupleIdentity (skeleton <$> taus) (skeleton $ t)
+skeleton (CoTupleType taus)                   = SCoTupleType (skeleton <$> taus)
+skeleton (CoTupleConstruct taus j t)          = SCoTupleConstruct (skeleton <$> taus) j (skeleton $ t)
+skeleton (CoTupleDestruct taus sigma fs)      = SCoTupleDestruct (skeleton <$> taus) (skeleton $ sigma) (skeleton <$> fs)
+skeleton (IdentityType tau x y)               = SIdentityType (skeleton $ tau) (skeleton $ x) (skeleton $ y)
+skeleton (IdentityReflective tau x)           = SIdentityReflective (skeleton $ tau) (skeleton $ x)
+skeleton (IdentityDestruct tau x y)           = SIdentityDestruct (skeleton $ tau) (skeleton $ x) (skeleton $ y)
+skeleton NatType                              = SNatType
+skeleton NatZ                                 = SNatZ
+skeleton NatS                                 = SNatS
+skeleton (NatInduction tau f x)               = SNatInduction (skeleton $ tau) (skeleton $ f) (skeleton $ x)
+--
 
 showWithEnvironment :: [String] -> Term -> String
 showWithEnvironment env = showWithEnvironment' 0
@@ -68,6 +120,7 @@ showWithEnvironment env = showWithEnvironment' 0
           blue "()"
     showWithEnvironment' i (TupleConstruct (tau:taus) (t:ts)) =
           "(" ++ showWithEnvironment' i t ++ ", " ++ showWithEnvironment' i (TupleConstruct taus ts) ++ ")"
+    showWithEnvironment' i (TupleConstruct taus ts) = blue "ERROR !!!!!"
     showWithEnvironment' i (TupleDestruct taus sigma f) =
           "(" ++ blue "match" <+> showWithEnvironment' i (TupleType taus) <+> red "to" <+> showWithEnvironment' (i + 1) sigma <+> red "with" <+> showWithEnvironment' i f ++ ")"
     showWithEnvironment' i (TupleIdentity _ t) =
@@ -149,5 +202,34 @@ unitValue = TupleConstruct [] []
 
 bottomType :: Term
 bottomType = CoTupleType []
+
+negate :: Term -> Term
+negate t = FunctionType t bottomType
+
+idCongType :: Term
+idCongType =
+  functionTypeList
+  [ SetType
+  , Variable 0
+  , Variable 1
+  , IdentityType (Variable 2) (Variable 1) (Variable 0)
+  , SetType
+  , FunctionType (Variable 4) (Variable 1)
+  ] $ IdentityType (Variable 1) (Application (Variable 0) (Variable 4)) (Application (Variable 0) (Variable 3))
+
+idCong :: Term
+idCong = 
+  abstractionList
+  [ SetType
+  , Variable 0
+  , Variable 1
+  , IdentityType (Variable 2) (Variable 1) (Variable 0)
+  , SetType
+  , FunctionType (Variable 4) (Variable 1)
+  ] $ applicationList (IdentityDestruct (Variable 5) (Variable 4) (Variable 3))
+    [ Variable 2
+    , Abstraction (Variable 5) (IdentityType (Variable 2) (Application (Variable 1) (Variable 5)) (Application (Variable 1) (Variable 0)))
+    , IdentityReflective (Variable 1) (Application (Variable 0) (Variable 4))
+    ]
 
 \end{code}

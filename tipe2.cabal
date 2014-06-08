@@ -9,7 +9,8 @@ executable tipe2
   main-is:             Main.lhs
   other-modules:       Term,
                        Environment,
-                       Evaluation
+                       Evaluation,
+                       ProofSearch
   build-depends:       base >=4.6,
                        containers,
                        mtl,

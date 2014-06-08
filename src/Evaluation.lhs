@@ -75,11 +75,11 @@ unify gamma e1 e2 = do
           return $ (tau' `Env.bind` gamma, (tau' : taus', t' : ts'))
         ) (gamma, ([], [])) (zip (zip taus1 ts1) (zip taus2 ts2))
     unify' gamma (TupleDestruct taus1 sigma1 f1) (TupleDestruct taus2 sigma2 f2)       = do
-      taus' <- snd <$> foldM (\(gamma', taus') (tau1, tau2) -> do
+      (gamma', taus') <- foldM (\(gamma', taus') (tau1, tau2) -> do
           tau' <- unify gamma' tau1 tau2
           return $ (tau' `Env.bind` gamma, tau' : taus')
         ) (gamma, []) (zip taus1 taus2)
-      sigma' <- unify gamma sigma1 sigma2
+      sigma' <- unify gamma' sigma1 sigma2
       f' <- unify gamma f1 f2
       return $ TupleDestruct taus' sigma' f'
     unify' gamma (TupleIdentity taus1 t1) (TupleIdentity taus2 t2)                     = do
@@ -194,7 +194,8 @@ normalise gamma e = normalise' =<< (normaliseHead gamma e)
       return $ TupleConstruct taus' ts'
     normalise' (TupleDestruct taus sigma f)         = do
       TupleType taus' <- normalise gamma $ TupleType taus
-      sigma' <- normalise (TupleType taus' `Env.bind` gamma) sigma
+      let gamma' = foldr (Env.bind) gamma taus
+      sigma' <- normalise gamma' sigma
       f' <- normalise gamma f
       return $ TupleDestruct taus' sigma' f'
     normalise' (TupleIdentity taus t)         = do
@@ -281,10 +282,13 @@ typecheck gamma t = (typecheck' gamma t) `catchError` (throwError . TypecheckErr
       return $ TupleType taus
     typecheck' gamma (TupleDestruct taus sigma f)         = do
       typecheck' gamma (TupleType taus)
-      sigmaTy <- typecheck gamma sigma
-      unify gamma sigmaTy $ functionTypeList taus SetType
+      sigmaTy <- typecheck (TupleType taus `Env.bind` gamma) sigma
+      let sigmaF = Abstraction (TupleType taus) sigma
+      unify (TupleType taus `Env.bind` gamma) sigmaTy SetType
       fTy <- typecheck gamma f
-      unify gamma fTy $ functionTypeList taus sigma
+      unify gamma fTy $ functionTypeList taus $
+        Application (liftBy (length taus) 0 $ sigmaF) $ TupleConstruct (liftBy (length taus) 0 <$> taus) (Variable <$> reverse [0 .. length taus - 1])
+      return $ FunctionType (TupleType taus) sigma
     typecheck' gamma (TupleIdentity taus t)               = do
       typecheck' gamma (TupleType taus)
       tTy <- typecheck gamma t
