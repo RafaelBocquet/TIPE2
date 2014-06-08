@@ -14,6 +14,8 @@ import Control.Monad
 import Data.Monoid
 import Data.List as List
 
+import Data.Sequence (Seq, ViewL (EmptyL, (:<)), (><))
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Map (Map)
@@ -77,27 +79,48 @@ data ProofSearch = ProofSearch TypeIsomorphism [ProofSearchItem]
 --        ()
 
 makeProofSearchItem :: Environment -> Term -> ProofSearchItem
-makeProofSearchItem (Environment env) t = traceShow env $ 
-  let le = length env in
-  let env' = (uncurry liftBy) <$> zip [1..] env in
-  let depMap = Map.fromList . zip [0..] $ dependencies . (env' !!) <$> [0 .. le - 1] in
-  let permut = reverse $ topoSort depMap in
-  traceShow permut $
-    ProofSearchItem [] (trivialIsomorphism SetType)
+makeProofSearchItem (Environment env) t =
+  let le        = length env in
+  let env'      = (uncurry liftBy) <$> zip [1..] env in
+  let depMap    = Map.fromList . zip [0..] $ dependencies . (env' !!) <$> [0 .. le - 1] in
+  let depList   = depUnion env' [] (Seq.fromList $ dependencies t) in
+  let permut    = reverse $ topoSort env' depMap depList in
+  let nEnv      = applyPermutation permut <$> (env' !!) . (permut !!) <$> [0 .. le - 1] in
+  let nT        = applyPermutation permut t in
+  let nEnvIsom  = normalIsomorphism <$> nEnv in
+  let nTIsom    = normalIsomorphism nT in
+    ProofSearchItem nEnvIsom nTIsom
     where
-      topoSort depMap
-        | Map.null depMap     = []
-        | otherwise           =
-            let next = minimum' . Map.keys . Map.filter List.null $ depMap in
-            next : (topoSort $ List.delete next <$> Map.delete next depMap)
+      depUnion :: [Term] -> [Int] -> Seq Int -> [Int]
+      depUnion env l sq = case Seq.viewl sq of
+        EmptyL -> l
+        x :< xs -> if x `elem` l
+          then depUnion env l xs
+          else depUnion env (x:l) (xs >< (Seq.fromList $ dependencies $ env !! x))
 
-      minimum' [] = error "Should not happen"
-      minimum' (x:[]) = x
-      minimum' (x:xs) =
-        let y = minimum' xs in
-        if skeleton (env !! x) <= skeleton (env !! y)
-          then x
-          else y
+      topoSort :: [Term] -> Map Int [Int] -> [Int] -> [Int]
+      topoSort env depMap depList 
+        | Map.null depMap               = []
+        | otherwise                     =
+            let next = minimum' env depList . Map.keys . Map.filter List.null $ depMap in
+            next : topoSort env (List.delete next <$> Map.delete next depMap) (depUnion env depList $ Seq.singleton next)
+
+      minimum' :: [Term] -> [Int] -> [Int] -> Int
+      minimum' env depList [] = error "Should not happen"
+      minimum' env depList (x:[]) = x
+      minimum' env depList (x:xs) =
+        let y = minimum' env depList xs in
+        case compare (skeleton $ env !! x) (skeleton $ env !! y) of
+          LT -> x
+          EQ -> case (findIndex (== x) depList, findIndex (== y) depList) of
+            (Just xI, Just yI) ->
+              if xI < yI
+                then x
+                else y
+            (Just _, Nothing) -> x
+            (Nothing, Just _) -> y
+            (Nothing, Nothing) -> traceShow "FIXME" $ x
+          GT -> y
 
 proofSearchItemIsomorphism :: ProofSearchItem -> TypeIsomorphism
 proofSearchItemIsomorphism (ProofSearchItem env t) =
@@ -173,7 +196,8 @@ data TypeIsomorphism = TypeIsomorphism
 trivialIsomorphism :: Term -> TypeIsomorphism
 trivialIsomorphism tau = TypeIsomorphism tau tau (Abstraction tau $ Variable 0) (Abstraction tau $ Variable 0)
 
---normalIsomorphism :: Environment -> Term -> PC TypeIsomorphism
+normalIsomorphism :: Term -> TypeIsomorphism
+normalIsomorphism e               = trivialIsomorphism e
 --normalIsomorphism gamma e@(Variable i)              = return $ trivialIsomorphism e
 --normalIsomorphism gamma e@(Application f t)           = return $ trivialIsomorphism e
 --  --fTy <- pcOfEC $ typecheck gamma f

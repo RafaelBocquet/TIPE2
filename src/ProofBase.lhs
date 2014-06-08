@@ -43,7 +43,9 @@ insertProofItem item@(ProofSearchItem env t) prf base@(ProofBase bFull bSkel) =
   let pTerm = isomorphismMemberType t in
   let pEnv = isomorphismMemberType <$> env in
   let lIndex = maybe 0 length $ Map.lookup pTerm bFull in
-  let fEntry = (Application (isomorphismTo pIsom) prf, pEnv) in
+  let prf' = Application (isomorphismTo pIsom) prf in
+  traceShow (runEC $ typecheck Env.empty prf') $
+  let fEntry = (prf', pEnv) in
   let sEntry = (pTerm, lIndex, skeleton <$> pEnv) in
   ProofBase
     (Map.alter (Just . maybe [fEntry] (++ [fEntry])) pTerm bFull)
@@ -62,7 +64,7 @@ insertProof prop proof base =
     Right prop' -> case runPC $ proofSearch Env.empty prop' of
       Right (ProofSearch isom pItems) ->
         let pTaus = uncurry liftBy <$> zip [0..] (isomorphismMemberType . proofSearchItemIsomorphism <$> pItems) in
-        foldr (uncurry insertProofItem) base $ zip pItems (($ SetType) <$> (Application . tupleProjection pTaus) <$> [0..]) -- TODO : change id
+        foldr (uncurry insertProofItem) base $ zip pItems (($ Application (isomorphismTo isom) proof) <$> (Application . tupleProjection pTaus) <$> [0..]) -- TODO : change id
       Left err -> traceShow err $ base
     Left err -> traceShow err $ base
 

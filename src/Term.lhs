@@ -156,8 +156,8 @@ instance Show Term where
 
 liftBy' :: Int -> Int -> Term -> Term
 liftBy' n i (Variable j)
-  | j >= i                                      = Variable (j + n)
-  | otherwise                                   = Variable j
+  | j >= i                                       = Variable (j + n)
+  | otherwise                                    = Variable j
 liftBy' n i (Application f t)                    = Application (liftBy' n i $ f) (liftBy' n i $ t)
 liftBy' n i SetType                              = SetType
 liftBy' n i (Abstraction tau t)                  = Abstraction (liftBy' n i $ tau) (liftBy' n (i + 1) $ t)
@@ -226,7 +226,33 @@ dependencies = dependencies' 0
       | x `elem` l    = union' l xs
       | otherwise     = union' (x:l) xs
 
--- Smart constructors
+applyPermutation :: [Int] -> Term -> Term
+applyPermutation s = applyPermutation' 0
+  where
+    applyPermutation' i (Variable j)
+      | j >= i + length s                                = Variable j
+      | j >= i                                           = Variable $ i + s !! (j - i)
+      | otherwise                                        = Variable j
+    applyPermutation' i (Application f t)                = Application (applyPermutation' i $ f) (applyPermutation' i $ t)
+    applyPermutation' i SetType                          = SetType
+    applyPermutation' i (Abstraction tau t)              = Abstraction (applyPermutation' i $ tau) (applyPermutation' (i + 1) $ t)
+    applyPermutation' i (FunctionType tau sigma)         = FunctionType (applyPermutation' i $ tau) (applyPermutation' (i + 1) $ sigma)
+    applyPermutation' i (TupleType taus)                 = TupleType (uncurry (applyPermutation') <$> zip [i..] taus)
+    applyPermutation' i (TupleConstruct taus ts)         = TupleConstruct (uncurry (applyPermutation') <$> zip [i..] taus) (applyPermutation' i <$> ts)
+    applyPermutation' i (TupleDestruct taus sigma f)     = TupleDestruct (uncurry (applyPermutation') <$> zip [i..] taus) (applyPermutation' (i + 1) $ sigma) (applyPermutation' i $ f)
+    applyPermutation' i (TupleIdentity taus t)           = TupleIdentity (uncurry (applyPermutation') <$> zip [i..] taus) (applyPermutation' i $ t)
+    applyPermutation' i (CoTupleType taus)               = CoTupleType (applyPermutation' i <$> taus)
+    applyPermutation' i (CoTupleConstruct taus j t)      = CoTupleConstruct (applyPermutation' i <$> taus) j (applyPermutation' i $ t)
+    applyPermutation' i (CoTupleDestruct taus sigma fs)  = CoTupleDestruct (applyPermutation' i <$> taus) (applyPermutation' (i + 1) $ sigma) (applyPermutation' i <$> fs)
+    applyPermutation' i (IdentityType tau x y)           = IdentityType (applyPermutation' i $ tau) (applyPermutation' i $ x) (applyPermutation' i $ y)
+    applyPermutation' i (IdentityReflective tau x)       = IdentityReflective (applyPermutation' i $ tau) (applyPermutation' i $ x)
+    applyPermutation' i (IdentityDestruct tau x y)       = IdentityDestruct (applyPermutation' i $ tau) (applyPermutation' i $ x) (applyPermutation' i $ y)
+    applyPermutation' i NatType                          = NatType
+    applyPermutation' i NatZ                             = NatZ
+    applyPermutation' i NatS                             = NatS
+    applyPermutation' i (NatInduction tau f x)           = NatInduction (applyPermutation' i $ tau) (applyPermutation' i $ f) (applyPermutation' i $ x)
+
+-- Smart constructors and common types
 
 applicationList :: Term -> [Term] -> Term
 applicationList = foldl Application
