@@ -119,12 +119,12 @@ mainBase :: ProofBase
 mainBase = insertProofList PB.empty
   [ (SetType, unitType)
   , (unitType, unitValue)
-  --, (unitIsUniqueType, unitIsUnique)
-  --, (idSymmetricType, idSymmetric)
-  --, (idCType, idC)
-  --, (indSuccIsNatType, indSuccIsNat)
+  , (unitIsUniqueType, unitIsUnique)
+  , (idSymmetricType, idSymmetric)
+  , (idCType, idC)
+  , (indSuccIsNatType, indSuccIsNat)
   , (proj1Type, proj1)
-  --, (proj2Type, proj2)
+  , (proj2Type, proj2)
   ]
 
 main :: IO ()
@@ -148,6 +148,8 @@ main = do
 
   putStrLn $ blue " --- ProofSearch --- "
 
+  testProofSearch "SetType" SetType
+  testProofSearch "unitType" unitType
   testProofSearch "proj1Type" proj1Type
   testProofSearch "proj2Type" proj2Type
   testProofSearch "idSymmetricType" idSymmetricType

@@ -189,6 +189,13 @@ lift = liftBy 1
 liftList :: [Term] -> [Term]
 liftList = liftListBy 1
 
+lowerBy :: Int -> Term -> Term
+lowerBy n = liftBy (-n)
+
+lower :: Term -> Term
+lower = lowerBy 1
+
+
 -- List of dependencies, sorted by order of insertion (left to right)
 
 dependencies :: Term -> [Int]

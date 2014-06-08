@@ -87,8 +87,9 @@ makeProofSearchItem (Environment env) t =
   let permut    = reverse $ topoSort env' depMap depList in
   let nEnv      = applyPermutation permut <$> (env' !!) . (permut !!) <$> [0 .. le - 1] in
   let nT        = applyPermutation permut t in
-  let nEnvIsom  = normalIsomorphism <$> nEnv in
+  let nEnvIsom  = normalIsomorphism <$> uncurry lowerBy <$> zip [1..] nEnv in
   let nTIsom    = normalIsomorphism nT in
+    -- traceShow (nEnvIsom, nTIsom)
     ProofSearchItem nEnvIsom nTIsom
     where
       depUnion :: [Term] -> [Int] -> Seq Int -> [Int]
@@ -124,21 +125,35 @@ makeProofSearchItem (Environment env) t =
 
 proofSearchItemIsomorphism :: ProofSearchItem -> TypeIsomorphism
 proofSearchItemIsomorphism (ProofSearchItem env t) =
-  let e = functionTypeList (isomorphismOriginalType <$> env) (isomorphismOriginalType t) in
-  let e' = functionTypeList (isomorphismMemberType <$> env) (isomorphismMemberType t) in
+  let e = functionTypeList (isomorphismOriginalType <$> reverse env) (isomorphismOriginalType t) in
+  let e' = functionTypeList (isomorphismMemberType <$> reverse env) (isomorphismMemberType t) in
   let le = length env in
+  --traceShow (e, e') $ 
+  --traceShow (isomorphismTo t) $
+  --traceShow (isomorphismTo t) $
+  --traceShow (Abstraction e $
+  --      abstractionList (lift . isomorphismMemberType <$> reverse env) $
+  --        Application (liftBy (le+1) $ isomorphismTo t) $
+  --          applicationList (Variable le) (uncurry Application <$> zip (liftBy (le+1) . isomorphismFrom <$> env) (Variable <$> reverse [0..le-1]))) $
+  --traceShow (runEC $ typecheck Env.empty e) $
+  --traceShow (runEC $ typecheck Env.empty e') $
+  --traceShow (uncurry liftBy <$> (zip (reverse [1..le]) $ isomorphismFrom <$> reverse env)) $
   TypeIsomorphism
     e
     e'
     ( Abstraction e $
-        abstractionList (lift . isomorphismMemberType <$> env) $
-          Application (liftBy (le+1) $ isomorphismTo t) $
-            applicationList (Variable le) (uncurry Application <$> zip (liftBy (le+1) . isomorphismFrom <$> env) (Variable <$> reverse [0..le-1]))
+        abstractionList (liftList $ isomorphismMemberType <$> reverse env) $
+          Application (liftBy 0 $ isomorphismTo t) $
+            applicationList
+              (Variable le)
+              (uncurry Application <$> zip (uncurry liftBy <$> (zip (reverse [1..le]) $ isomorphismFrom <$> reverse env)) (Variable <$> reverse [0..le-1]))
     )
     ( Abstraction e $
-        abstractionList (lift . isomorphismMemberType <$> env) $
-          Application (liftBy (le+1) $ isomorphismTo t) $
-            applicationList (Variable le) (uncurry Application <$> zip (liftBy (le+1) . isomorphismTo <$> env) (Variable <$> reverse [0..le-1]))
+        abstractionList (liftList $ isomorphismOriginalType <$> reverse env) $
+          Application (liftBy 0 $ isomorphismFrom t) $
+            applicationList
+              (Variable le)
+              (uncurry Application <$> zip (uncurry liftBy <$> (zip (reverse [1..le]) $ isomorphismTo <$> reverse env)) (Variable <$> reverse [0..le-1]))
     )
 
 makeProofSearch :: Environment -> Term -> ProofSearch
@@ -147,6 +162,10 @@ makeProofSearch gamma t =
   let prfIsom = proofSearchItemIsomorphism prfItem in
   let e = isomorphismOriginalType prfIsom in
   let e' = isomorphismMemberType prfIsom in
+  --traceShow (runEC $ typecheck Env.empty e) $
+  --traceShow (runEC $ typecheck Env.empty e') $
+  --traceShow (runEC $ typecheck Env.empty $ isomorphismTo prfIsom) $
+  --traceShow (runEC $ typecheck Env.empty $ isomorphismFrom prfIsom) $
   flip ProofSearch [prfItem] $
     TypeIsomorphism
       e

@@ -28,7 +28,7 @@ data ProofBase = ProofBase
   }
 
 instance Show ProofBase where
-  show (ProofBase bFull _) = mconcat $ (\(key,dat) -> "\n" ++ show key <+> mconcat (("\n\t" ++) . show <$> dat)) <$> Map.toList bFull
+  show (ProofBase bFull _) = mconcat $ (\(key,dat) -> "\n" ++ show key <+> mconcat (("\n\t" ++) . show . snd <$> dat)) <$> Map.toList bFull
 
 --insertProofSearch :: ProofBase -> ProofSearch -> ProofBase
 --insertProofSearch (ProofBase bFull bSkel) (ProofSearch t (Environment env)) =
@@ -44,7 +44,7 @@ insertProofItem item@(ProofSearchItem env t) prf base@(ProofBase bFull bSkel) =
   let pEnv = isomorphismMemberType <$> env in
   let lIndex = maybe 0 length $ Map.lookup pTerm bFull in
   let prf' = Application (isomorphismTo pIsom) prf in
-  traceShow (runEC $ typecheck Env.empty prf') $
+  -- traceShow (runEC $ typecheck Env.empty prf') $
   let fEntry = (prf', pEnv) in
   let sEntry = (pTerm, lIndex, skeleton <$> pEnv) in
   ProofBase
