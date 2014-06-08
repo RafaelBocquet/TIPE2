@@ -127,8 +127,8 @@ unify gamma e1 e2 = do
 
 normaliseHead :: Environment -> Term -> EC Term
 normaliseHead gamma (Variable i)                                                                  = return $ Variable i
-normaliseHead gamma (Application (Abstraction tau e) t)                                           = traceShow e $ traceShow t $ normaliseHead gamma $ substitute (Subst.single t) e
-normaliseHead gamma e@(Application p@(TupleDestruct taus sigma f) t)                                = do
+normaliseHead gamma (Application (Abstraction tau e) t)                                           = normaliseHead gamma $ substitute (Subst.single t) e
+normaliseHead gamma e@(Application p@(TupleDestruct taus sigma f) t)                              = do
   t' <- normaliseHead gamma t
   case t' of
     TupleConstruct _ ts ->

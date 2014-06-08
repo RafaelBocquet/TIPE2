@@ -6,6 +6,7 @@ import Environment as Env
 import Substitution as Subst
 import Evaluation as Eval
 import ProofSearch
+import Util
 
 import Prelude hiding (lookup)
 import Control.Applicative
@@ -25,7 +26,9 @@ data ProofBase = ProofBase
   { proofBaseFull     :: Map Term [(Term, [Term])]
   , proofBaseSkeleton :: Map TermSkeleton [(Term, Int, [TermSkeleton])]
   }
-  deriving (Show)
+
+instance Show ProofBase where
+  show (ProofBase bFull _) = mconcat $ (\(key,dat) -> "\n" ++ show key <+> mconcat (("\n\t" ++) . show <$> dat)) <$> Map.toList bFull
 
 --insertProofSearch :: ProofBase -> ProofSearch -> ProofBase
 --insertProofSearch (ProofBase bFull bSkel) (ProofSearch t (Environment env)) =
@@ -57,8 +60,9 @@ insertProof prop proof base =
     return prop'
   of
     Right prop' -> case runPC $ proofSearch Env.empty prop' of
-      Right (ProofSearch _ pItems) ->
-        foldr insertProofItem base pItems -- TupleProjecttion + zip
+      Right (ProofSearch isom pItems) ->
+        let pTaus = uncurry liftBy <$> zip [0..] (isomorphismMemberType . proofSearchItemIsomorphism <$> pItems) in
+        foldr (uncurry insertProofItem) base $ zip pItems (($ SetType) <$> (Application . tupleProjection pTaus) <$> [0..]) -- TODO : change id
       Left err -> traceShow err $ base
     Left err -> traceShow err $ base
 
@@ -66,6 +70,6 @@ lookupProof :: Term -> ProofBase -> Maybe Term
 lookupProof _ _ = Nothing
 
 insertProofList :: ProofBase -> [(Term, Term)] -> ProofBase
-insertProofList = foldr (\(prop, proof) base -> insertProof base prop proof)
+insertProofList = foldr (uncurry insertProof)
 
 \end{code}

@@ -6,8 +6,11 @@ import Util
 import Control.Applicative
 import Control.Monad
 
+import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Map (Map)
 import qualified Data.Map as Map
+
 import Data.Char
 
 -- Term
@@ -186,6 +189,43 @@ lift = liftBy 1
 liftList :: [Term] -> [Term]
 liftList = liftListBy 1
 
+-- List of dependencies, sorted by order of insertion (left to right)
+
+dependencies :: Term -> [Int]
+dependencies = dependencies' 0
+  where
+    dependencies' :: Int -> Term -> [Int]
+    dependencies' i (Variable j)
+      | j >= i                                           = [j - i]
+      | otherwise                                        = []
+    dependencies' i (Application f t)                    = unions' [dependencies' i $ f, dependencies' i $ t]
+    dependencies' i SetType                              = []
+    dependencies' i (Abstraction tau t)                  = unions' $ [dependencies' i $ tau, dependencies' (i + 1) $ t]
+    dependencies' i (FunctionType tau sigma)             = unions' $ [dependencies' i $ tau, dependencies' (i + 1) $ sigma]
+    dependencies' i (TupleType taus)                     = unions' $ (uncurry dependencies' <$> zip [i..] taus)
+    dependencies' i (TupleConstruct taus ts)             = unions' $ (uncurry dependencies' <$> zip [i..] taus) ++ (dependencies' i <$> ts)
+    dependencies' i (TupleDestruct taus sigma f)         = unions' $ (uncurry dependencies' <$> zip [i..] taus) ++ [dependencies' (i + 1) $ sigma, dependencies' i $ f]
+    dependencies' i (TupleIdentity taus t)               = unions' $ (uncurry dependencies' <$> zip [i..] taus) ++ [dependencies' i $ t]
+    dependencies' i (CoTupleType taus)                   = unions' $ (dependencies' i <$> taus)
+    dependencies' i (CoTupleConstruct taus j t)          = unions' $ (dependencies' i <$> taus) ++ [dependencies' i $ t]
+    dependencies' i (CoTupleDestruct taus sigma fs)      = unions' $ (dependencies' i <$> taus) ++ [dependencies' (i + 1) $ sigma] ++ (dependencies' i <$> fs)
+    dependencies' i (IdentityType tau x y)               = unions' $ [dependencies' i $ tau, dependencies' i $ x, dependencies' i $ y]
+    dependencies' i (IdentityReflective tau x)           = unions' $ [dependencies' i $ tau, dependencies' i $ x]
+    dependencies' i (IdentityDestruct tau x y)           = unions' $ [dependencies' i $ tau, dependencies' i $ x, dependencies' i $ y]
+    dependencies' i NatType                              = []
+    dependencies' i NatZ                                 = []
+    dependencies' i NatS                                 = []
+    dependencies' i (NatInduction tau f x)               = unions' [dependencies' i $ tau, dependencies' i $ f, dependencies' i $ x]
+
+    unions' :: [[Int]] -> [Int]
+    unions'           = foldl union' []
+
+    union' :: [Int] -> [Int] -> [Int]
+    union' l []       = l
+    union' l (x:xs)
+      | x `elem` l    = union' l xs
+      | otherwise     = union' (x:l) xs
+
 -- Smart constructors
 
 applicationList :: Term -> [Term] -> Term
@@ -240,7 +280,7 @@ tupleProjection taus j =
   let lt = length taus in
   TupleDestruct
     taus
-    (Application (TupleDestruct (liftList taus) SetType $ abstractionList (liftList taus) $ liftBy (1+lt) $ taus !! j) (Variable 0))
+    (Application (TupleDestruct (liftList taus) SetType $ abstractionList (liftList taus) $ liftBy (1+lt-j) $ taus !! j) (Variable 0))
     (abstractionList taus $ Variable (lt-1-j))
 
 \end{code}

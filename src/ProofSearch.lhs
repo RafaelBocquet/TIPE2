@@ -12,7 +12,12 @@ import Control.Applicative
 import Control.Monad
 
 import Data.Monoid
-import Data.List
+import Data.List as List
+
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 import Control.Monad.Trans.Either
 import Control.Monad.Error.Class
@@ -72,7 +77,27 @@ data ProofSearch = ProofSearch TypeIsomorphism [ProofSearchItem]
 --        ()
 
 makeProofSearchItem :: Environment -> Term -> ProofSearchItem
-makeProofSearchItem gamma t = ProofSearchItem [] (trivialIsomorphism SetType)
+makeProofSearchItem (Environment env) t = traceShow env $ 
+  let le = length env in
+  let env' = (uncurry liftBy) <$> zip [1..] env in
+  let depMap = Map.fromList . zip [0..] $ dependencies . (env' !!) <$> [0 .. le - 1] in
+  let permut = reverse $ topoSort depMap in
+  traceShow permut $
+    ProofSearchItem [] (trivialIsomorphism SetType)
+    where
+      topoSort depMap
+        | Map.null depMap     = []
+        | otherwise           =
+            let next = minimum' . Map.keys . Map.filter List.null $ depMap in
+            next : (topoSort $ List.delete next <$> Map.delete next depMap)
+
+      minimum' [] = error "Should not happen"
+      minimum' (x:[]) = x
+      minimum' (x:xs) =
+        let y = minimum' xs in
+        if skeleton (env !! x) <= skeleton (env !! y)
+          then x
+          else y
 
 proofSearchItemIsomorphism :: ProofSearchItem -> TypeIsomorphism
 proofSearchItemIsomorphism (ProofSearchItem env t) =
@@ -148,48 +173,48 @@ data TypeIsomorphism = TypeIsomorphism
 trivialIsomorphism :: Term -> TypeIsomorphism
 trivialIsomorphism tau = TypeIsomorphism tau tau (Abstraction tau $ Variable 0) (Abstraction tau $ Variable 0)
 
-isomorphism :: Environment -> Term -> PC TypeIsomorphism
-isomorphism gamma e@(Variable i)              = return $ trivialIsomorphism e
-isomorphism gamma e@(Application f t)           = return $ trivialIsomorphism e
-  --fTy <- pcOfEC $ typecheck gamma f
-  --case fTy of
-  --  FunctionType tau sigma -> do
-  --    throwError $ OtherError "TODO"
-  --  _ -> throwError $ OtherError "Should not happen..."
-proofSearch' gamma e@SetType                  = return $ trivialIsomorphism e
-proofSearch' gamma e@(TupleType taus)         = return $ trivialIsomorphism e
-proofSearch' gamma e@(CoTupleType taus)       = return $ trivialIsomorphism e
-proofSearch' gamma e@(IdentityType tau x y)   = return $ trivialIsomorphism e
-  --TypeIsomorphism tauM tauT tauF <- isomorphism gamma tau
-  ---- compare x and y, swap ?
-  --tau' <- pcOfEC $ normalise tauM
-  --x' <- pcOfEC $ normalise (Application tauT x) 
-  --y' <- pcOfEC $ normalise (Application tauT y)
-  --if skeleton x <= skeleton y
-  --  then return 
-  --  else
-  --let e' = IdentityType tauM (Application tauT x) (Application tauT y)
-  --return $ TypeIsomorphism
-  --  e'
-  --  (Abstraction e $ applicationList idCong
-  --    [ lift tau
-  --    , lift x
-  --    , lift y
-  --    , Variable 0
-  --    , lift tauM
-  --    , lift tauT
-  --    ]
-  --  )
-  --  (Abstraction e' $ applicationList idCong
-  --    [ lift tauM
-  --    , lift (Application tauT x)
-  --    , lift (Application tauT y)
-  --    , Variable 0
-  --    , lift tau
-  --    , lift tauF
-  --    ]
-  --  )
-proofSearch' gamma e@NatType                  = return $ trivialIsomorphism e
-proofSearch' gamma _                          = throwError $ OtherError ""
+--normalIsomorphism :: Environment -> Term -> PC TypeIsomorphism
+--normalIsomorphism gamma e@(Variable i)              = return $ trivialIsomorphism e
+--normalIsomorphism gamma e@(Application f t)           = return $ trivialIsomorphism e
+--  --fTy <- pcOfEC $ typecheck gamma f
+--  --case fTy of
+--  --  FunctionType tau sigma -> do
+--  --    throwError $ OtherError "TODO"
+--  --  _ -> throwError $ OtherError "Should not happen..."
+--normalIsomorphism gamma e@SetType                  = return $ trivialIsomorphism e
+--normalIsomorphism gamma e@(TupleType taus)         = return $ trivialIsomorphism e
+--normalIsomorphism gamma e@(CoTupleType taus)       = return $ trivialIsomorphism e
+--normalIsomorphism gamma e@(IdentityType tau x y)   = return $ trivialIsomorphism e
+--  --TypeIsomorphism tauM tauT tauF <- normalIsomorphism gamma tau
+--  ---- compare x and y, swap ?
+--  --tau' <- pcOfEC $ normalise tauM
+--  --x' <- pcOfEC $ normalise (Application tauT x) 
+--  --y' <- pcOfEC $ normalise (Application tauT y)
+--  --if skeleton x <= skeleton y
+--  --  then return 
+--  --  else
+--  --let e' = IdentityType tauM (Application tauT x) (Application tauT y)
+--  --return $ TypeIsomorphism
+--  --  e'
+--  --  (Abstraction e $ applicationList idCong
+--  --    [ lift tau
+--  --    , lift x
+--  --    , lift y
+--  --    , Variable 0
+--  --    , lift tauM
+--  --    , lift tauT
+--  --    ]
+--  --  )
+--  --  (Abstraction e' $ applicationList idCong
+--  --    [ lift tauM
+--  --    , lift (Application tauT x)
+--  --    , lift (Application tauT y)
+--  --    , Variable 0
+--  --    , lift tau
+--  --    , lift tauF
+--  --    ]
+--  --  )
+--normalIsomorphism gamma e@NatType                  = return $ trivialIsomorphism e
+--normalIsomorphism gamma _                          = throwError $ OtherError ""
 
 \end{code}
