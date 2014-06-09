@@ -1,5 +1,6 @@
 \documentclass[12pt, a4paper]{article}
 
+\usepackage{auto-pst-pdf}
 \usepackage[utf8]{inputenc}
 \usepackage[french]{babel}
 \usepackage[T1]{fontenc}
@@ -56,50 +57,56 @@
 
 \section{Position du problème}
 \subsection{$\lambda \equiv P$}
-Les systèmes de types dépendants ont deux domaines d'utilisation pouvant se recouper. preuves math + programmes.
+Les systèmes de types dépendants ont plusieurs domaines d'utilisation pouvant se recouper. L'isomorphisme de Curry-Howard permet d'interpreter les types de plusieurs manieres. Les types peuvent etre interprétés comme des propositions en logique intutioniste, et les programmes membres d'un type peuvent être vus comme des preuves de ces propositions. Cela permet de les appliquer dans les systemes de preuves assistée par ordinateur et l'écriture de programmes.
 \subsection{Recherche de preuves triviales}
 L'utilisations d'un tel système de type pour la programmation permet et exige de prouver que les programmes écrits sont corrects, et l'écriture des programmes nécessite des preuves sur les objects manipulés. Une grande partie des preuves que doit fournir l'utilisateur peuvent lui paraitre triviales, mais fournir les preuves peut tout de même demander un effort et du temps de sa part. On peut se dire que les propositions simples portant sur les objets courants manipulés (entiers naturels, ensembles finis, booléens, listes, ...) ont déjà étées prouvés par un autre programmeur. On s'interesse alors à un système permettant de retrouver et utiliser ces preuves déjà fournies.
 
 Cependant, le contexte dans lequel on demande ces preuves peut etre different du contexte dans lequel la preuve originale a été fournie, et on souhaite de plus tirer parti des multiples isomorphismes entre les types du système.
-\section{Système de type utilisé}
+\section{Système de types et notations utilisées}
 
-\begin{tabular}{ | c | c | c | c | }
+
+
+\section{Système de type}
+
+\small\begin{table}[h!]\begin{center}\begin{tabular}{ | c | c | c | c | }
 \hline
-Type & Interpretation prog & Interpretation logique & Interpretation ensembliste \\
+Termes et types & Interpretation prog & Interpretation logique & Interpretation ensembliste \\
 \hline
-$U$                     & Type des types\footnotemark[1]   & \dots                                      & \dots \\
-$V_i$                   & Variable                         & \dots                                      & \dots \\
-$f\,t$                  & Application                      & \dots                                      & \dots \\
+$U$                     & Type des types\footnotemark[1]   & \dots                                      & \dots              \\
+$V_i$                   & Variable                         & \dots                                      & \dots              \\
+$f\,t$                  & Application                      & \dots                                      & \dots              \\
 \hline   
-$\lambda (a : A). f(a)$ & Abstraction                      & Prédicat sur A                             & Fonction de A à B \\
-$\Pi{a : A}. B(a)$      & Type des fonctions de A à B      & $A \implies B$ ou $\forall a \in A, B(a)$  & $B(a)^A$ \\
+$\lambda (a : A). f(a)$ & Abstraction                      & Prédicat sur A                             & Fonction de A à B  \\
+$\Pi{a : A}. B(a)$      & Type des fonctions de A à B      & $A \implies B$ ou $\forall a \in A, B(a)$  & $B^A$           \\
 \hline   
-$\Sigma{a : A}. B(a)$   & Paire                            & $A \wedge B$ ou $\exists a \in A, B(a)$    & $A \times B(a)$ \\
-$\top$                  & \dots                            & Proposition vraie                          & Singleton \\
+$\Sigma{a : A}. B(a)$   & Paire                            & $A \wedge B$ ou $\exists a \in A, B(a)$    & $A \times B$    \\
+$\top$                  & \dots                            & Proposition vraie                          & Singleton          \\
 \hline   
-$\langle A | B \rangle$ & Union disjointe                  & $A \vee B$                                 & $A \cup B$ \\
-$\bot$                  & \dots                            & Proposition fausse                         & $\emptyset$ \\
+$\langle A | B \rangle$ & Union disjointe                  & $A \vee B$                                 & $A \cup B$         \\
+$\bot$                  & \dots                            & Proposition fausse                         & $\emptyset$        \\
 \hline   
-$x =_A y$               & \dots                            & Egalité                                    & \dots \\
+$x =_A y$               & \dots                            & Egalité                                    & \dots              \\
 \hline   
-$\mathbb{N}$            & Entiers naturels\footnotemark[2] & \dots                                      & $\mathbb{N}$ \\
-$\mathbb{N}Z$           & Zéro                             & \dots                                      & $0$ \\
-$\mathbb{N}S$           & Successeur                       & \dots                                      & $n \mapsto n+1$ \\
-$\mathbb{N}F$           & Recursion                        & Principe de récurrence                     & \dots \\
+$\mathbb{N}$            & Entiers naturels\footnotemark[2] & \dots                                      & $\mathbb{N}$       \\
+$\mathbb{N}Z$           & Zéro                             & \dots                                      & $0$                \\
+$\mathbb{N}S$           & Successeur                       & \dots                                      & $n \mapsto n+1$    \\
+$\mathbb{N}F$           & Recursion                        & Principe de récurrence                     & \dots              \\
 \hline
-\end{tabular}
+\end{tabular}\end{center}\caption{A picture of a gull.}\end{table}
 
 \footnotetext[1]{Cette définition de $U$ peut rendre le système logique incohérent.}
 \footnotetext[2]{Je n'ai, pour simplifier, considéré que le type $\mathbb{N}$ comme type plus complexe. On pourrait considerer l'ensemble des types définis par induction ou coinduction.}
 
 \subsection{Isomorphismes}
 
+
+
 \begin{align*}
-(A \times B(a)) \rightarrow C(a, b)                   \quad&\cong\quad   A \rightarrow B(a) \rightarrow C(a, b)     \\
-(A \times (B \times C))                               \quad&\cong\quad   (A \times B \times C)                      \\
-\langle A | \langle B | C\rangle\rangle               \quad&\cong\quad   \langle A | B | C\rangle   \\
-\langle A | B \rangle \rightarrow C                   \quad&\cong\quad   (A \rightarrow C) \times (B \rightarrow C) \\
-x =_A y                                               \quad&\cong\quad   y =_A x                                    \\
+(A \times B(a)) \rightarrow C(a, b)                   \quad&\cong\quad   A \rightarrow B(a) \rightarrow C(a, b)       \\
+(A \times (B \times C))                               \quad&\cong\quad   (A \times B \times C)                        \\
+\langle A | \langle B | C\rangle\rangle               \quad&\cong\quad   \langle A | B | C\rangle                     \\
+\langle A | B \rangle \rightarrow C                   \quad&\cong\quad   (A \rightarrow C) \times (B \rightarrow C)   \\
+x =_A y                                               \quad&\cong\quad   y =_A x                                      \\
 \end{align*}
 
 Definitions : 
@@ -113,13 +120,13 @@ Une première partie de l'algorithme qui sera utlisé lors de l'insertion ainsi 
 
 Prenons par exemple la proposition $(P : U) \rightarrow (Q : U) \rightarrow P \rightarrow (P \rightarrow Q) \rightarrow Q$, dont une preuve est $\lambda (P : U). \lambda (Q : U). \lambda (p : P). \lambda (f : P \rightarrow Q). f\,p$. On commence par placer ses hypothèses dans l'environement : $[P : U, Q : U, _ : P, _ : P \rightarrow Q]$, conclusion $Q$. On remplace chacun des termes de la conclusion par les types isomorphes normaux. Ici, les types sont déjà normaux. On considère le graphe d'interdepences entre les hypothèses.
 
-\begin{psfrags}
+\begin{center}\begin{psfrags}
 \nodepsfrag{n0}{$P : U$}
 \nodepsfrag{n1}{$Q : U$}
 \nodepsfrag{n2}{$P$}
 \nodepsfrag{n3}{$P \rightarrow Q$}
 \nodepsfrag{n4}{$Q$}
-\expandafter\digraph G {
+\expandafter\digraph {modusPonens} {
   graph[size=8];
   node[shape=rectangle];
   n0[width=\csuse{n0width}, height=\csuse{n0height}];
@@ -131,33 +138,100 @@ Prenons par exemple la proposition $(P : U) \rightarrow (Q : U) \rightarrow P \r
   n3 -> {n0, n1};
   n2 -> n0;
 }
-\end{psfrags}
+\end{psfrags}\end{center}
 
-On réorganise les hypothèses dans l'environement par tri topologique sur ce graphe. Lorsque dans ce tri on a le choix entre plusieurs termes, on choisit celui qui est apparu le premier dans les dépendences des termes déjà considérés, ou si aucun des termes n'est une dépendence des termes déjà considérés, on choisit celui qui est minimum pour une relation d'ordre totale sur son skelette quelconque. Ces choix nous assurent que toute permutation valide de l'environement permet d'arriver sur le meme environmenet normalisé, et que sur toute extension de l'environement, les hypothèses communes sont ordonnées de la meme facon, ce qui sera crucial dans la recherche dans la base de preuves.
+On réorganise les hypothèses dans l'environement par tri topologique sur ce graphe. Lorsque dans ce tri on a le choix entre plusieurs termes, on choisit celui qui est apparu le premier dans les dépendences des termes déjà considérés, ou si aucun des termes n'est une dépendence des termes déjà considérés, on choisit celui qui est minimum pour une relation d'ordre totale sur son skelette quelconque. Ces choix doivent nous assurer que toute permutation valide de l'environement permet d'arriver sur le meme environmenet normalisé, et que sur toute extension de l'environement, les hypothèses communes sont ordonnées de la meme facon, ce qui sera crucial dans la recherche dans la base de preuves. Il y a des cas où cela n'est pas assuré, c'est une des choses à améliorer.
 
 Cela donne pour le Modus Ponens : \\
-\begin{tabular}{ | c | c | c | c | }
+\begin{center}\begin{tabular}{ | c | c | c | c | }
 \hline
-Environement & Possibilités & Choix & Raison \\
+Environement                         & Possibilités           & Choix             & Raison                                    \\
 \hline
-$\emptyset$ & $P$, $P \rightarrow Q$ & $P \rightarrow Q$ & $ \square \rightarrow \square < \square $ \\
-$[P \rightarrow Q]$ & $P$, $Q : U$ & $Q : U$ & Première dépendence \\
-$[Q : U, P \rightarrow Q]$ & $P$ & $P$ & Unique choix \\
-$[P, Q : U, P \rightarrow Q]$ & $P : U$ & $P : U$ & Unique choix \\
-$[P : U, P, Q : U, P \rightarrow Q]$ & & & Environement final \\
+$\emptyset$                          & $P$, $P \rightarrow Q$ & $P \rightarrow Q$ & $ \square \rightarrow \square < \square $ \\
+$[P \rightarrow Q]$                  & $P$, $Q : U$           & $Q : U$           & Première dépendence                       \\
+$[Q : U, P \rightarrow Q]$           & $P$                    & $P$               & Unique choix                              \\
+$[P, Q : U, P \rightarrow Q]$        & $P : U$                & $P : U$           & Unique choix                              \\
+$[P : U, P, Q : U, P \rightarrow Q]$ &                        &                   & Environement final                        \\
 \hline
-\end{tabular}
+\end{tabular}\end{center}
 
 \subsection{Construction des isomorphismes}
 
+
+
 \section{Base de preuves}
-\subsection{Insersion d'une preuve dans la base}
+\subsection{Structure de la base}
+
+D'après les algorithmes précedents donnant des types normaux vis à vis des isomorphismes, il suffit de garder dans la base l'ensemble des couples (type normal, preuve de ce type) pour les preuves fournies. On cherche une structure permettant de retrouver 
+La structure adoptée est alors : 
+  Une structure permettant l'indexage par la conclusion, donnant la liste des couples (preuves, hypothèses) pour cette conclusion.
+  Une structure permettant l'indexage par le squelette de la conclusion, donnant la liste des couples (index dans la premiere stucture, squelette des hypothèses).
+  Ces deux structures sont impléméntées par des arbres binaires de recherche (O(log(n) lookup)). Un hashage des squelettes permettrait une amélioration de la performance.
+ 
+ Nom des complexités : n  nombre de preuves dans la base.
+
+\subsection{Insertion d'une preuve dans la base}
+
+Pour inserer un couple (type normal, preuve) dans la base, on ajoute simplement les données nécessaire aux deux structures.
+
 \subsection{Recherche d'une preuve dans la base}
+
+La recherche d'un type dans la base est un plus difficile. Il faut en effet tenir en compte du fait que l'environment de recherche peut contenir plus d'éléments que l'environement de la preuve recherchée. De par la construction des environements des types normaux, si les deux environements correspondent, alors les correspondences sont croissantes.
+On exploite la seconde structure pour filtrer les éléments de la première. 
+
+\section{Conclusion}
+Je n'ai en fait pas implémenté ce système completement, mais c'est principalement par manque de temps, je ne vois psa d'obstacle majeur à sa completion, . Il serait interessant de savoir si l'integratino d'un tel système à un système de type réelement utilisé apporterait vraiment qq chose, c est a dire si les preuves qui apparaissent triviales au programmeur seraient en effet tres susceptibles d'etre des preuves isomorphes a des preuves deja fournies par un autre programmeur, si il y en effet redondances des preuves neccessaire a la programmation dans un systeme de types dependenets.
 
 \nocite{*}
 \bibliographystyle{plain}
 \bibliography{presentation}
 
-% \include{../graph}
+
+Exemple : général / particulier
+Peut ne pas spécialiser une preuve sur les relations d'equivalence à la relation d'égalité...
+
+autre exemple : = est transitive (cas de non unicité du choix) :\\ 
+$(A : U) \rightarrow (a : A) \rightarrow (b : A) \rightarrow (c : A) \rightarrow  a =_A b \rightarrow  b =_A c \rightarrow  a =_A c$
+
+\begin{center}\begin{psfrags}
+\nodepsfrag{n0}{$A : U$}
+\nodepsfrag{n1}{$a : A$}
+\nodepsfrag{n2}{$b : A$}
+\nodepsfrag{n3}{$c : A$}
+\nodepsfrag{n4}{$a =_A b$}
+\nodepsfrag{n5}{$b =_A c$}
+\nodepsfrag{n6}{$a =_A c$}
+\expandafter\digraph {idTransitive} {
+  graph[size=8];
+  node[shape=rectangle];
+  n0[width=\csuse{n0width}, height=\csuse{n0height}];
+  n1[width=\csuse{n1width}, height=\csuse{n1height}];
+  n2[width=\csuse{n2width}, height=\csuse{n2height}];
+  n3[width=\csuse{n3width}, height=\csuse{n3height}];
+  n4[width=\csuse{n4width}, height=\csuse{n4height}];
+  n5[width=\csuse{n5width}, height=\csuse{n5height}];
+  n6[width=\csuse{n6width}, height=\csuse{n6height}, color=red];
+  n6 -> {n1, n3};
+  n5 -> {n2, n3};
+  n4 -> {n1, n2};
+  n3 -> n0;
+  n2 -> n0;
+  n1 -> n0;
+}
+\end{psfrags}\end{center}
+
+\begin{center}\begin{tabular}{ | c | c | c | c | }
+\hline
+Environement                       & Possibilités           & Choix     & Raison \\
+\hline
+$\emptyset$                                      & $a =_A b$, $b =_A c$   & $a =_A b$ & \textcolor{red}{Non déterministe}       \\
+$[a =_A b]$                                      & $b =_A c$, $a : A$     & $a : A$   & Première dépendence                     \\
+$[a : A, a =_A b]$                               & $b =_A c$              & $b =_A c$ & Unique choix                            \\
+$[b =_A c, a : A, a =_A b]$                      & $b : A$, $c : A$       & $c : A$   & Première dépendence                     \\
+$[c : A, b =_A c, a : A, a =_A b]$               & $b : A$                & $b : A$   & Unique choix                            \\
+$[b : A, c : A, b =_A c, a : A, a =_A b]$        & $A : U$                & $A : U$   & Unique choix                            \\
+$[A : U, b : A, c : A, b =_A c, a : A, a =_A b]$ &                        &           & Environement final                      \\
+\hline
+\end{tabular}\end{center}
 
 \end{document}

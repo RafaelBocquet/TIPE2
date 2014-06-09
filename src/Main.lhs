@@ -77,6 +77,39 @@ idC =
     , IdentityReflective (Variable 1) (Application (Variable 0) (Variable 4))
     ]
 
+idTransitiveType :: Term
+idTransitiveType =
+  functionTypeList
+  [ SetType
+  , Variable 0
+  , Variable 1
+  , Variable 2
+  , IdentityType (Variable 3) (Variable 2) (Variable 1)
+  , IdentityType (Variable 4) (Variable 2) (Variable 1)
+  ] $ IdentityType (Variable 5) (Variable 4) (Variable 2)
+
+idTransitive :: Term
+idTransitive =
+  abstractionList
+  [ SetType
+  , Variable 0
+  , Variable 1
+  , Variable 2
+  , IdentityType (Variable 3) (Variable 2) (Variable 1)
+  , IdentityType (Variable 4) (Variable 2) (Variable 1)
+  ] $ applicationList
+    (IdentityDestruct (Variable 5) (Variable 3) (Variable 4))
+    [ applicationList
+        idSymmetric
+        [ Variable 5
+        , Variable 4
+        , Variable 3
+        , Variable 1
+        ]
+    , Abstraction (Variable 5) $ IdentityType (Variable 6) (Variable 0) (Variable 3)
+    , Variable 0
+    ]
+
 one :: Term
 one = Application NatS NatZ
 
@@ -146,6 +179,7 @@ mainBase = insertProofList PB.empty
   , (proj2Type, proj2)
   , (modusPonensBisType, modusPonensBis)
   , (modusPonensType, modusPonens)
+  , (idTransitiveType, idTransitive)
   ]
 
 main :: IO ()
@@ -168,6 +202,8 @@ main = do
   testTypecheck "proj2" proj2 proj2Type
   testTypecheck "modusPonensBisType" modusPonensBisType SetType
   testTypecheck "modusPonensBis" modusPonensBis modusPonensBisType
+  testTypecheck "idTransitiveType" idTransitiveType SetType
+  testTypecheck "idTransitive" idTransitive idTransitiveType
 
   putStrLn $ blue " --- ProofSearch --- "
 
