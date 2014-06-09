@@ -71,10 +71,12 @@ data ProofSearch = ProofSearch TypeIsomorphism [ProofSearchItem]
 --  mappend (ProofSearch isom1 l1) (ProofSearch isom2 l2) =
 --    let le1 = length l1 in
 --    let le2 = length l2 in
+--    let e   =  in 
+--    let e'  = TupleType $ uncurry liftBy <$> zip [0..] (l1 ++ l2) in
 --    flip ProofSearch (l1 ++ l2) $
 --      TypeIsomorphism
 --        ()
---        (TupleType $ uncurry liftBy <$> zip [0..] (l1 ++ l2))
+--        ()
 --        ()
 --        ()
 
@@ -159,11 +161,9 @@ makeProofSearch gamma t =
       (TupleDestruct [e'] (lift e) (lift $ isomorphismFrom prfIsom))
 
 proofSearch :: Environment -> Term -> PC ProofSearch
-proofSearch = proofSearch' 
+proofSearch gamma t = (pcOfEC $ normalise gamma t) >>= (proofSearch' gamma)
   where
-    proofSearch' gamma (FunctionType tau sigma)   =
-      let gamma' = tau `Env.bind` gamma in
-      proofSearch' gamma' sigma
+    proofSearch' gamma (FunctionType tau sigma)   = proofSearchBind tau gamma sigma
       -- liftM mconcat $ (\(i, gamma') -> proofSearch gamma' $ liftBy i sigma) `mapM` gammas
     proofSearch' gamma e@(Application f t)        = return $ makeProofSearch gamma e
     proofSearch' gamma e@(Variable j)             = return $ makeProofSearch gamma e
@@ -174,17 +174,18 @@ proofSearch = proofSearch'
     proofSearch' gamma e@NatType                  = return $ makeProofSearch gamma e
     proofSearch' gamma _                          = throwError $ OtherError ""
 
-    --proofSearchBind :: Term -> Environment -> [(Int, Environment)]
-    --proofSearchBind t@(TupleType []) gamma        = [(0, t `Env.bind` gamma)]
-    --proofSearchBind (TupleType taus) gamma        =
-    --  foldr (\tau gammas ->
-    --    mconcat $ (\(i, gamma') -> update1 (i+1) <$> (liftBy i tau) `proofSearchBind` gamma') <$> gammas
-    --  ) [(-1, gamma)] taus
-    --proofSearchBind t gamma                       =
-    --  [(0, t `Env.bind` gamma)]
+    proofSearchBind :: Term -> Environment -> Term -> PC ProofSearch
+    proofSearchBind (TupleType []) gamma sigma     =
+      proofSearch gamma $ substitute (unitValue `Subst.bind` Subst.empty) sigma
+    proofSearchBind (TupleType taus) gamma sigma     =
+      let le = length taus in
+      let sigma' = liftBy le $ flip substitute sigma $ Subst.single $ TupleConstruct taus $ Variable <$> reverse [0 .. le-1] in
+      proofSearch gamma $ functionTypeList taus sigma'
+    proofSearchBind tau gamma sigma                  =
+      proofSearch (tau `Env.bind` gamma) sigma
 
-    --update1 :: Int -> (Int, Environment) -> (Int, Environment)
-    --update1 j (i, gamma) = (i+j, gamma)
+    update1 :: Int -> (Int, Environment) -> (Int, Environment)
+    update1 j (i, gamma) = (i+j, gamma)
 
 -- Isomorphisms
 
@@ -201,16 +202,16 @@ trivialIsomorphism :: Term -> TypeIsomorphism
 trivialIsomorphism tau = TypeIsomorphism tau tau (Abstraction tau $ Variable 0) (Abstraction tau $ Variable 0)
 
 normalIsomorphism :: Term -> TypeIsomorphism
-normalIsomorphism e               = trivialIsomorphism e
---normalIsomorphism gamma e@(Variable i)              = return $ trivialIsomorphism e
+normalIsomorphism e@(Variable i)                    = trivialIsomorphism e
+normalIsomorphism e@SetType                         = trivialIsomorphism e
+normalIsomorphism e@(TupleType taus)                = trivialIsomorphism e
+normalIsomorphism e                                 = trivialIsomorphism e
 --normalIsomorphism gamma e@(Application f t)           = return $ trivialIsomorphism e
 --  --fTy <- pcOfEC $ typecheck gamma f
 --  --case fTy of
 --  --  FunctionType tau sigma -> do
 --  --    throwError $ OtherError "TODO"
 --  --  _ -> throwError $ OtherError "Should not happen..."
---normalIsomorphism gamma e@SetType                  = return $ trivialIsomorphism e
---normalIsomorphism gamma e@(TupleType taus)         = return $ trivialIsomorphism e
 --normalIsomorphism gamma e@(CoTupleType taus)       = return $ trivialIsomorphism e
 --normalIsomorphism gamma e@(IdentityType tau x y)   = return $ trivialIsomorphism e
 --  --TypeIsomorphism tauM tauT tauF <- normalIsomorphism gamma tau

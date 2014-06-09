@@ -115,6 +115,16 @@ proj2 = abstractionList [SetType, SetType] $ tupleProjection [Variable 1, Variab
 decidable :: Term
 decidable = Abstraction SetType $ CoTupleType [Variable 0, T.negate $ Variable 0]
 
+modusPonensBisType :: Term
+modusPonensBisType = functionTypeList [SetType, SetType, TupleType [Variable 1, FunctionType (Variable 2) (Variable 2)]] $ Variable 1
+
+modusPonensBis :: Term
+modusPonensBis = abstractionList [SetType, SetType] $
+  TupleDestruct
+    [Variable 1, FunctionType (Variable 2) (Variable 2)]
+    (Variable 1)
+    (abstractionList [Variable 1, FunctionType (Variable 2) (Variable 2)] $ Application (Variable 0) (Variable 1))
+
 mainBase :: ProofBase
 mainBase = insertProofList PB.empty
   [ (SetType, unitType)
@@ -145,6 +155,8 @@ main = do
   testTypecheck "proj1" proj1 proj1Type
   testTypecheck "proj2Type" proj2Type SetType
   testTypecheck "proj2" proj2 proj2Type
+  testTypecheck "modusPonensBisType" modusPonensBisType SetType
+  testTypecheck "modusPonensBis" modusPonensBis modusPonensBisType
 
   putStrLn $ blue " --- ProofSearch --- "
 

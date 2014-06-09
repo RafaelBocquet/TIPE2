@@ -9,6 +9,8 @@ import Util
 import Prelude hiding (lookup)
 import Control.Applicative
 import Control.Monad
+import Control.Arrow hiding ((<+>))
+import Data.Function
 
 import Control.Monad.Trans.Either
 import Control.Monad.Error.Class
@@ -65,12 +67,12 @@ unify gamma e1 e2 = do
       sigma' <- unify (tau' `Env.bind` gamma) sigma1 sigma2
       return $ FunctionType tau' sigma'
     unify' gamma (TupleType taus1) (TupleType taus2)                                   = do
-      TupleType . snd <$> foldM (\(gamma', taus') (tau1, tau2) -> do
+      TupleType . reverse . snd <$> foldM (\(gamma', taus') (tau1, tau2) -> do
           tau' <- unify gamma' tau1 tau2
           return $ (tau' `Env.bind` gamma, tau' : taus')
         ) (gamma, []) (zip taus1 taus2)
     unify' gamma (TupleConstruct taus1 ts1) (TupleConstruct taus2 ts2)                 = do
-      uncurry TupleConstruct . snd <$> foldM (\(gamma', (taus', ts')) ((tau1, t1), (tau2, t2)) -> do
+      uncurry (TupleConstruct `on` reverse) . snd <$> foldM (\(gamma', (taus', ts')) ((tau1, t1), (tau2, t2)) -> do
           tau' <- unify gamma' tau1 tau2
           t' <- unify gamma' t1 t2
           return $ (tau' `Env.bind` gamma, (tau' : taus', t' : ts'))
@@ -82,7 +84,7 @@ unify gamma e1 e2 = do
         ) (gamma, []) (zip taus1 taus2)
       sigma' <- unify gamma' sigma1 sigma2
       f' <- unify gamma f1 f2
-      return $ TupleDestruct taus' sigma' f'
+      return $ TupleDestruct (reverse taus') sigma' f'
     unify' gamma (TupleIdentity taus1 t1) (TupleIdentity taus2 t2)                     = do
       taus' <- snd <$> foldM (\(gamma', taus') (tau1, tau2) -> do
           tau' <- unify gamma' tau1 tau2
@@ -187,7 +189,7 @@ normalise gamma e = normalise' =<< (normaliseHead gamma e)
       sigma' <- normalise (tau' `Env.bind` gamma) sigma
       return $ FunctionType tau' sigma'
     normalise' (TupleType taus) =
-      TupleType . snd <$> foldM (\(gamma', taus') tau -> do
+      TupleType . reverse . snd <$> foldM (\(gamma', taus') tau -> do
           tau' <- normalise gamma' tau
           return (tau `Env.bind` gamma, tau' : taus') 
         ) (gamma, []) taus
