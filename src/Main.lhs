@@ -13,7 +13,9 @@ import Control.Monad
 
 testTypecheck :: String -> Term -> Term -> IO ()
 testTypecheck s t tau = do
-  putStrLn . either ((yellow s <+> ":" <+>) . show) ((yellow s <+> ":" <+>) . show . runEC . (unify Env.empty tau <=< normalise Env.empty)) . runEC . typecheck Env.empty $ t
+  putStrLn . either
+    ((yellow s <+> ":" <+>) . show)
+    ((yellow s <+> "(" <+> show t <+> ")" <+> yellow ":" <+>) . show . runEC . unify Env.empty tau) . runEC . typecheck Env.empty $ t
 
 testProofSearch :: String -> Term -> IO ()
 testProofSearch s tau = do
@@ -115,6 +117,13 @@ proj2 = abstractionList [SetType, SetType] $ tupleProjection [Variable 1, Variab
 decidable :: Term
 decidable = Abstraction SetType $ CoTupleType [Variable 0, T.negate $ Variable 0]
 
+modusPonensType :: Term
+modusPonensType = functionTypeList [SetType, SetType, Variable 1, FunctionType (Variable 2) (Variable 2)] $ Variable 2
+
+modusPonens :: Term
+modusPonens = abstractionList [SetType, SetType, Variable 1, FunctionType (Variable 2) (Variable 2)] $
+  Application (Variable 0) (Variable 1)
+
 modusPonensBisType :: Term
 modusPonensBisType = functionTypeList [SetType, SetType, TupleType [Variable 1, FunctionType (Variable 2) (Variable 2)]] $ Variable 1
 
@@ -135,6 +144,8 @@ mainBase = insertProofList PB.empty
   , (indSuccIsNatType, indSuccIsNat)
   , (proj1Type, proj1)
   , (proj2Type, proj2)
+  , (modusPonensBisType, modusPonensBis)
+  , (modusPonensType, modusPonens)
   ]
 
 main :: IO ()
@@ -160,13 +171,13 @@ main = do
 
   putStrLn $ blue " --- ProofSearch --- "
 
-  testProofSearch "SetType" SetType
-  testProofSearch "unitType" unitType
-  testProofSearch "proj1Type" proj1Type
-  testProofSearch "proj2Type" proj2Type
-  testProofSearch "idSymmetricType" idSymmetricType
-  testProofSearch "idCType" idCType
-  testProofSearch "indSuccIsNatType" indSuccIsNatType
+  --testProofSearch "SetType" SetType
+  --testProofSearch "unitType" unitType
+  --testProofSearch "proj1Type" proj1Type
+  --testProofSearch "proj2Type" proj2Type
+  --testProofSearch "idSymmetricType" idSymmetricType
+  --testProofSearch "idCType" idCType
+  --testProofSearch "indSuccIsNatType" indSuccIsNatType
 
   putStrLn $ blue " --- ProofBase --- "
   putStrLn $ show mainBase

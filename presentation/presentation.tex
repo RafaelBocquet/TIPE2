@@ -13,6 +13,8 @@
 \usepackage{graphviz}
 \usepackage{etoolbox}
 \usepackage[nomessages]{fp}
+\usepackage{amsmath}
+\usepackage{amssymb}
 
 % Title
 
@@ -51,19 +53,110 @@
 
 \newpage
 
+
 \section{Position du problème}
 \subsection{$\lambda \equiv P$}
+Les systèmes de types dépendants ont deux domaines d'utilisation pouvant se recouper. preuves math + programmes.
 \subsection{Recherche de preuves triviales}
-\section{Implementations possibles}
-\subsection{Prolog-like auto tactic} $\rightarrow$ Can't scale
-\subsection{Recherche exacte / isomorphismes} $\rightarrow$ Less powerfull, more scalable
-\section{Implementation}
-\subsection{Normalisation d'un type + gamma}
-\subsection{Normalisation d'un type + gamma / isomorphismes}
-\subsection{Recherche du type normalisé dans la base}
-\subsection{Construction de la preuve dans l'environment donné}
-\section{Further}
-\subsection{Integration avec un systeme de types réel}
+L'utilisations d'un tel système de type pour la programmation permet et exige de prouver que les programmes écrits sont corrects, et l'écriture des programmes nécessite des preuves sur les objects manipulés. Une grande partie des preuves que doit fournir l'utilisateur peuvent lui paraitre triviales, mais fournir les preuves peut tout de même demander un effort et du temps de sa part. On peut se dire que les propositions simples portant sur les objets courants manipulés (entiers naturels, ensembles finis, booléens, listes, ...) ont déjà étées prouvés par un autre programmeur. On s'interesse alors à un système permettant de retrouver et utiliser ces preuves déjà fournies.
+
+Cependant, le contexte dans lequel on demande ces preuves peut etre different du contexte dans lequel la preuve originale a été fournie, et on souhaite de plus tirer parti des multiples isomorphismes entre les types du système.
+\section{Système de type utilisé}
+
+\begin{tabular}{ | c | c | c | c | }
+\hline
+Type & Interpretation prog & Interpretation logique & Interpretation ensembliste \\
+\hline
+$U$                     & Type des types\footnotemark[1]   & \dots                                      & \dots \\
+$V_i$                   & Variable                         & \dots                                      & \dots \\
+$f\,t$                  & Application                      & \dots                                      & \dots \\
+\hline   
+$\lambda (a : A). f(a)$ & Abstraction                      & Prédicat sur A                             & Fonction de A à B \\
+$\Pi{a : A}. B(a)$      & Type des fonctions de A à B      & $A \implies B$ ou $\forall a \in A, B(a)$  & $B(a)^A$ \\
+\hline   
+$\Sigma{a : A}. B(a)$   & Paire                            & $A \wedge B$ ou $\exists a \in A, B(a)$    & $A \times B(a)$ \\
+$\top$                  & \dots                            & Proposition vraie                          & Singleton \\
+\hline   
+$\langle A | B \rangle$ & Union disjointe                  & $A \vee B$                                 & $A \cup B$ \\
+$\bot$                  & \dots                            & Proposition fausse                         & $\emptyset$ \\
+\hline   
+$x =_A y$               & \dots                            & Egalité                                    & \dots \\
+\hline   
+$\mathbb{N}$            & Entiers naturels\footnotemark[2] & \dots                                      & $\mathbb{N}$ \\
+$\mathbb{N}Z$           & Zéro                             & \dots                                      & $0$ \\
+$\mathbb{N}S$           & Successeur                       & \dots                                      & $n \mapsto n+1$ \\
+$\mathbb{N}F$           & Recursion                        & Principe de récurrence                     & \dots \\
+\hline
+\end{tabular}
+
+\footnotetext[1]{Cette définition de $U$ peut rendre le système logique incohérent.}
+\footnotetext[2]{Je n'ai, pour simplifier, considéré que le type $\mathbb{N}$ comme type plus complexe. On pourrait considerer l'ensemble des types définis par induction ou coinduction.}
+
+\subsection{Isomorphismes}
+
+\begin{align*}
+(A \times B(a)) \rightarrow C(a, b)                   \quad&\cong\quad   A \rightarrow B(a) \rightarrow C(a, b)     \\
+(A \times (B \times C))                               \quad&\cong\quad   (A \times B \times C)                      \\
+\langle A | \langle B | C\rangle\rangle               \quad&\cong\quad   \langle A | B | C\rangle   \\
+\langle A | B \rangle \rightarrow C                   \quad&\cong\quad   (A \rightarrow C) \times (B \rightarrow C) \\
+x =_A y                                               \quad&\cong\quad   y =_A x                                    \\
+\end{align*}
+
+Definitions : 
+  - Terme
+  - Environment
+  - ???
+
+\section{Normalisation des propositions}
+\subsection{Construction du type normalisé vis à vis des isomorphismes}
+Une première partie de l'algorithme qui sera utlisé lors de l'insertion ainsi que de la recherche dans la base s'attache à construire pour le type d'une proposition, le type normalisé de cette proposition vis à vis des isomorphismes considérés, dans l'environement des hypothèses de la proposition.
+
+Prenons par exemple la proposition $(P : U) \rightarrow (Q : U) \rightarrow P \rightarrow (P \rightarrow Q) \rightarrow Q$, dont une preuve est $\lambda (P : U). \lambda (Q : U). \lambda (p : P). \lambda (f : P \rightarrow Q). f\,p$. On commence par placer ses hypothèses dans l'environement : $[P : U, Q : U, _ : P, _ : P \rightarrow Q]$, conclusion $Q$. On remplace chacun des termes de la conclusion par les types isomorphes normaux. Ici, les types sont déjà normaux. On considère le graphe d'interdepences entre les hypothèses.
+
+\begin{psfrags}
+\nodepsfrag{n0}{$P : U$}
+\nodepsfrag{n1}{$Q : U$}
+\nodepsfrag{n2}{$P$}
+\nodepsfrag{n3}{$P \rightarrow Q$}
+\nodepsfrag{n4}{$Q$}
+\expandafter\digraph G {
+  graph[size=8];
+  node[shape=rectangle];
+  n0[width=\csuse{n0width}, height=\csuse{n0height}];
+  n1[width=\csuse{n1width}, height=\csuse{n1height}];
+  n2[width=\csuse{n2width}, height=\csuse{n2height}];
+  n3[width=\csuse{n3width}, height=\csuse{n3height}];
+  n4[width=\csuse{n4width}, height=\csuse{n4height}, color=red];
+  n4 -> n1;
+  n3 -> {n0, n1};
+  n2 -> n0;
+}
+\end{psfrags}
+
+On réorganise les hypothèses dans l'environement par tri topologique sur ce graphe. Lorsque dans ce tri on a le choix entre plusieurs termes, on choisit celui qui est apparu le premier dans les dépendences des termes déjà considérés, ou si aucun des termes n'est une dépendence des termes déjà considérés, on choisit celui qui est minimum pour une relation d'ordre totale sur son skelette quelconque. Ces choix nous assurent que toute permutation valide de l'environement permet d'arriver sur le meme environmenet normalisé, et que sur toute extension de l'environement, les hypothèses communes sont ordonnées de la meme facon, ce qui sera crucial dans la recherche dans la base de preuves.
+
+Cela donne pour le Modus Ponens : \\
+\begin{tabular}{ | c | c | c | c | }
+\hline
+Environement & Possibilités & Choix & Raison \\
+\hline
+$\emptyset$ & $P$, $P \rightarrow Q$ & $P \rightarrow Q$ & $ \square \rightarrow \square < \square $ \\
+$[P \rightarrow Q]$ & $P$, $Q : U$ & $Q : U$ & Première dépendence \\
+$[Q : U, P \rightarrow Q]$ & $P$ & $P$ & Unique choix \\
+$[P, Q : U, P \rightarrow Q]$ & $P : U$ & $P : U$ & Unique choix \\
+$[P : U, P, Q : U, P \rightarrow Q]$ & & & Environement final \\
+\hline
+\end{tabular}
+
+\subsection{Construction des isomorphismes}
+
+\section{Base de preuves}
+\subsection{Insersion d'une preuve dans la base}
+\subsection{Recherche d'une preuve dans la base}
+
+\nocite{*}
+\bibliographystyle{plain}
+\bibliography{presentation}
 
 % \include{../graph}
 
