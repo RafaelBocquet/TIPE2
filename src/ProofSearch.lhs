@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE TupleSections #-}
 module ProofSearch where
 
 import Term
@@ -66,29 +67,17 @@ data ProofSearchItem = ProofSearchItem
 data ProofSearch = ProofSearch TypeIsomorphism [ProofSearchItem]
   deriving (Show)
 
---instance Monoid ProofSearch where
---  mempty = ProofSearch (trivialIsomorphism unitType) []
---  mappend (ProofSearch isom1 l1) (ProofSearch isom2 l2) =
---    let le1 = length l1 in
---    let le2 = length l2 in
---    let e   =  in 
---    let e'  = TupleType $ uncurry liftBy <$> zip [0..] (l1 ++ l2) in
---    flip ProofSearch (l1 ++ l2) $
---      TypeIsomorphism
---        ()
---        ()
---        ()
---        ()
-
 makeProofSearchItem :: Environment -> Term -> ProofSearchItem
 makeProofSearchItem (Environment env) t =
   let le        = length env in
   let env'      = (uncurry liftBy) <$> zip [1..] env in
   let depMap    = Map.fromList . zip [0..] $ dependencies . (env' !!) <$> [0 .. le - 1] in
+  let revDepMap = Map.foldWithKey (\k -> flip $ foldr (Map.update (Just . (k :)))) (Map.fromList $ (, []) <$> [0 .. le - 1]) depMap in
   let depList   = depUnion env' [] (Seq.fromList $ dependencies t) in
-  let permut    = reverse $ topoSort env' depMap depList in
-  let nEnv      = applyPermutation permut <$> (env' !!) . (permut !!) <$> [0 .. le - 1] in
-  let nT        = applyPermutation permut t in
+  let permut    = topoSort env' revDepMap depList in
+  let invPermut = inversePermutation permut in
+  let nEnv      = applyPermutation invPermut <$> (env' !!) . (permut !!) <$> [0 .. le - 1] in
+  let nT        = applyPermutation invPermut t in
   let nEnvIsom  = normalIsomorphism <$> uncurry lowerBy <$> zip [1..] nEnv in
   let nTIsom    = normalIsomorphism nT in
     ProofSearchItem nEnvIsom nTIsom
@@ -121,8 +110,11 @@ makeProofSearchItem (Environment env) t =
                 else y
             (Just _, Nothing) -> x
             (Nothing, Just _) -> y
-            (Nothing, Nothing) -> traceShow "FIXME" $ x
+            (Nothing, Nothing) -> traceShow ("FIXME", env !! x, env !! y) $ x
           GT -> y
+
+      inversePermutation :: [Int] -> [Int]
+      inversePermutation s = map snd . sort $ zip s [1..]
 
 proofSearchItemIsomorphism :: ProofSearchItem -> TypeIsomorphism
 proofSearchItemIsomorphism (ProofSearchItem env t) =

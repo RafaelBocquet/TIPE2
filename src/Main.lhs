@@ -151,11 +151,14 @@ decidable :: Term
 decidable = Abstraction SetType $ CoTupleType [Variable 0, T.negate $ Variable 0]
 
 modusPonensType :: Term
-modusPonensType = functionTypeList [SetType, SetType, Variable 1, FunctionType (Variable 2) (Variable 2)] $ Variable 2
+modusPonensType = functionTypeList [SetType, SetType, FunctionType (Variable 1) (Variable 1), Variable 2] $ Variable 2
+
+modusPonensTypeAux :: Term
+modusPonensTypeAux = functionTypeList [SetType, SetType, SetType, Variable 1, FunctionType (Variable 2) (Variable 2)] $ Variable 2
 
 modusPonens :: Term
-modusPonens = abstractionList [SetType, SetType, Variable 1, FunctionType (Variable 2) (Variable 2)] $
-  Application (Variable 0) (Variable 1)
+modusPonens = abstractionList [SetType, SetType, FunctionType (Variable 1) (Variable 1), Variable 2] $
+  Application (Variable 1) (Variable 0)
 
 modusPonensBisType :: Term
 modusPonensBisType = functionTypeList [SetType, SetType, TupleType [Variable 1, FunctionType (Variable 2) (Variable 2)]] $ Variable 1
@@ -171,15 +174,15 @@ mainBase :: ProofBase
 mainBase = insertProofList PB.empty
   [ (SetType, unitType)
   , (unitType, unitValue)
-  , (unitIsUniqueType, unitIsUnique)
-  , (idSymmetricType, idSymmetric)
-  , (idCType, idC)
-  , (indSuccIsNatType, indSuccIsNat)
-  , (proj1Type, proj1)
-  , (proj2Type, proj2)
-  , (modusPonensBisType, modusPonensBis)
+  --, (unitIsUniqueType, unitIsUnique)
+  --, (idSymmetricType, idSymmetric)
+  --, (idCType, idC)
+  --, (indSuccIsNatType, indSuccIsNat)
+  --, (proj1Type, proj1)
+  --, (proj2Type, proj2)
+  --, (modusPonensBisType, modusPonensBis)
   , (modusPonensType, modusPonens)
-  , (idTransitiveType, idTransitive)
+  --, (idTransitiveType, idTransitive)
   ]
 
 main :: IO ()
@@ -217,4 +220,12 @@ main = do
 
   putStrLn $ blue " --- ProofBase --- "
   putStrLn $ show mainBase
+
+  --putStrLn $ show $ lookupProof SetType mainBase 
+  --putStrLn $ show $ lookupProof unitType mainBase 
+  --putStrLn $ show $ lookupProof proj1Type mainBase 
+  putStrLn $ show $ lookupProof modusPonensTypeAux mainBase 
+  --putStrLn $ case lookupProof modusPonensTypeAux mainBase of
+  --  Just a -> show $ runEC $ typecheck Env.empty a
+  --  Nothing -> "NO"
 \end{code}
