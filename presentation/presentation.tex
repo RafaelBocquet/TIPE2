@@ -16,6 +16,8 @@
 \usepackage[nomessages]{fp}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{array}
+\usepackage{multirow}
 
 % Title
 
@@ -70,16 +72,18 @@ Cependant, le contexte dans lequel on demande ces preuves peut etre different du
 
 \small\begin{table}[h!]\begin{center}\begin{tabular}{ | c | c | c | c | }
 \hline
-Termes et types & Interpretation prog & Interpretation logique & Interpretation ensembliste \\
+\multirow{2}{*}{Termes et types} & \multicolumn{3}{c|}{Interpretations} \\
+\cline{2-4}
+                        & Programmation                    & Logique                                    & Ensembliste        \\
 \hline
 $U$                     & Type des types\footnotemark[1]   & \dots                                      & \dots              \\
 $V_i$                   & Variable                         & \dots                                      & \dots              \\
 $f\,t$                  & Application                      & \dots                                      & \dots              \\
 \hline   
 $\lambda (a : A). f(a)$ & Abstraction                      & Prédicat sur A                             & Fonction de A à B  \\
-$\Pi{a : A}. B(a)$      & Type des fonctions de A à B      & $A \implies B$ ou $\forall a \in A, B(a)$  & $B^A$           \\
+$\Pi{a : A}. B(a)$      & Type des fonctions de A à B      & $A \implies B$ ou $\forall a \in A, B(a)$  & $B^A$              \\
 \hline   
-$\Sigma{a : A}. B(a)$   & Paire                            & $A \wedge B$ ou $\exists a \in A, B(a)$    & $A \times B$    \\
+$\Sigma{a : A}. B(a)$   & Paire                            & $A \wedge B$ ou $\exists a \in A, B(a)$    & $A \times B$       \\
 $\top$                  & \dots                            & Proposition vraie                          & Singleton          \\
 \hline   
 $\langle A | B \rangle$ & Union disjointe                  & $A \vee B$                                 & $A \cup B$         \\

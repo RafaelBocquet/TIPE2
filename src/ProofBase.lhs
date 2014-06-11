@@ -81,15 +81,14 @@ lookupProofItem item@(ProofSearchItem env t) base@(ProofBase bFull bSkel) =
   let pEnv = isomorphismMemberType <$> env in
   let pSkelEnv = skeleton <$> pEnv in do
     candidates <- Map.lookup (skeleton pTerm) bSkel
-    trace "Found candidate hypothesis !!!" $ listToMaybe . catMaybes . flip fmap candidates $ \(cTerm, cId, cSkel) -> do
+    listToMaybe . catMaybes . flip fmap candidates $ \(cTerm, cId, cSkel) -> do
       skeletonSubList pSkelEnv cSkel -- Should filter most
       (cIsom, cEnv) <- (!! cId) <$> Map.lookup cTerm bFull
       let lpEnv = (uncurry liftBy) <$> zip [1..] pEnv
       let lcEnv = (uncurry liftBy) <$> zip [1..] cEnv
-      bindings <- traceShow (pTerm, lpEnv, cTerm, lcEnv) $ bindingsFrom 0 pTerm cTerm
-      let a = fullSubList bindings (length lpEnv) pEnv (length lcEnv) cEnv
-      fBindings <- traceShow a a
-      traceShow "FOUND IT !!! " $ traceShow fBindings $ return SetType
+      bindings <- bindingsFrom 0 pTerm cTerm
+      fBindings <- fullSubList bindings 1 lpEnv 1 lcEnv
+      traceShow fBindings $ return SetType
 
   where
     skeletonSubList :: [TermSkeleton] -> [TermSkeleton] -> Maybe ()
@@ -100,17 +99,17 @@ lookupProofItem item@(ProofSearchItem env t) base@(ProofBase bFull bSkel) =
       | otherwise                    = skeletonSubList xs (y:ys)
 
     fullSubList :: Map Int Int -> Int -> [Term] -> Int -> [Term] -> Maybe (Map Int Int)
-    fullSubList bindings i _ 0 []                 = Just bindings
-    fullSubList bindings 0 [] j (_:_)             = Nothing
+    fullSubList bindings i _ j []                 = Just bindings
+    fullSubList bindings i [] j (_:_)             = Nothing
     fullSubList bindings i (x:xs) j (y:ys)
-      | skeleton x == skeleton y                  = traceShow (0, x, y, bindings) $ listToMaybe . catMaybes $
+      | skeleton x == skeleton y                  = listToMaybe . catMaybes $
         [ do
             nBindings <- bindingsFrom 0 x y
-            aBindings <- bindingsUnion bindings nBindings
-            fullSubList aBindings (i-1) xs (j-1) ys
-        , fullSubList bindings (i-1) xs j (y:ys)
+            aBindings <- bindingsUnions [bindings, nBindings, Map.singleton i j]
+            fullSubList aBindings (i+1) xs (j+1) ys
+        , fullSubList bindings (i+1) xs j (y:ys)
         ]
-      | otherwise                                 = traceShow (1, x, y, bindings) $ fullSubList bindings (i-1) xs (j-1) (y:ys)
+      | otherwise                                 = fullSubList bindings (i+1) xs j (y:ys)
 
     bindingsFrom :: Int -> Term -> Term -> Maybe (Map Int Int)
     bindingsFrom i (Variable j1) (Variable j2)
@@ -154,6 +153,7 @@ lookupProof prop base =
     Right prop' -> case runPC $ proofSearch Env.empty prop' of
       Right (ProofSearch isom pItems) -> do
         pItems' <- forM pItems $ \pItem -> lookupProofItem pItem base
+        traceShow pItems' $ return ()
         Nothing -- return $ Application (isomorphismFrom isom) $ TupleConstruct (uncurry liftBy <$> (zip [0..] $ isomorphismMemberType . proofSearchItemIsomorphism <$> pItems)) pItems'
       Left err -> traceShow err $ Nothing
     Left err -> traceShow err $ Nothing
